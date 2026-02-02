@@ -19,11 +19,11 @@ export async function resolveENS(name: string): Promise<{
   try {
     const chainRecord = await client.getEnsText({
       name: normalize(name),
-      key: 'com.stableroute.chain',
+      key: 'com.payagent.chain',
     })
     const tokenRecord = await client.getEnsText({
       name: normalize(name),
-      key: 'com.stableroute.token',
+      key: 'com.payagent.token',
     })
     preferredChain = chainRecord || undefined
     preferredToken = tokenRecord || undefined

@@ -10,11 +10,11 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 
-/// @title StableRouteHook
+/// @title PayAgentHook
 /// @notice A Uniswap v4 hook that acts as an intent resolver for stablecoin swaps.
 /// An off-chain AI oracle can set route recommendations (on-chain vs cross-chain)
 /// and the hook tracks swap analytics per pool.
-contract StableRouteHook is BaseHook {
+contract PayAgentHook is BaseHook {
     using PoolIdLibrary for PoolKey;
 
     // --- Custom Errors (gas-efficient) ---

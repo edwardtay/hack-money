@@ -3,7 +3,7 @@ import type { ParsedIntent } from '@/lib/types'
 import { CHAIN_MAP, getTokenAddress, getTokenDecimals } from './tokens'
 
 // Ensure LI.FI SDK is configured
-createConfig({ integrator: 'stableroute-hackmoney' })
+createConfig({ integrator: 'payagent' })
 
 export type TransactionData = {
   to: string

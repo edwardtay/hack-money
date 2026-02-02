@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "StableRoute",
-  description: "AI-powered stablecoin routing",
+  title: "PayAgent",
+  description: "AI payment agent for humans and machines",
 };
 
 export default function RootLayout({

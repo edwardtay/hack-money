@@ -3,7 +3,7 @@ import { type ParsedIntent } from '@/lib/types'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const SYSTEM_PROMPT = `You are StableRoute, an AI that parses natural language into stablecoin transaction intents.
+const SYSTEM_PROMPT = `You are PayAgent, an AI payment agent that parses natural language into stablecoin transaction intents.
 
 Given a user message, extract the intent as JSON:
 

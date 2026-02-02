@@ -3,7 +3,7 @@ import { mainnet, arbitrum, base, optimism } from 'wagmi/chains'
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 
 export const config = getDefaultConfig({
-  appName: 'StableRoute',
+  appName: 'PayAgent',
   projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || 'demo',
   chains: [mainnet, arbitrum, base, optimism],
   ssr: true,

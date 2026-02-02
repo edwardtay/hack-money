@@ -3,7 +3,7 @@ import type { RouteOption } from '@/lib/types'
 import { CHAIN_MAP, getTokenAddress, getTokenDecimals } from './tokens'
 import { getCached, setCache } from './route-cache'
 
-createConfig({ integrator: 'stableroute-hackmoney' })
+createConfig({ integrator: 'payagent' })
 
 export async function findRoutes(params: {
   fromAddress: string

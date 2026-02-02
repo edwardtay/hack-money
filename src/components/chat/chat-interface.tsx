@@ -16,7 +16,7 @@ export function ChatInterface() {
       id: 'welcome',
       role: 'agent',
       content:
-        'Hello! I\'m StableRoute, your AI-powered stablecoin assistant. I can help you transfer, swap, or pay with stablecoins across chains. What would you like to do?',
+        'PayAgent ready. Pay anyone by name, on any chain. Try "pay vitalik.eth 100 USDC" or connect your wallet to begin.',
       timestamp: Date.now(),
     },
   ])

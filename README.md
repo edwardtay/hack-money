@@ -1,8 +1,6 @@
-# StableRoute
+# PayAgent
 
-AI-powered cross-chain stablecoin payment agent. Type natural language commands like "send 100 USDC to vitalik.eth on Arbitrum" and StableRoute finds the cheapest route, resolves ENS names, and executes the transaction.
-
-Built for [ETHGlobal HackMoney 2026](https://ethglobal.com/events/hackmoney2026/).
+AI payment agent for humans and machines. Pay anyone by name, on any chain.
 
 ## Architecture
 
@@ -14,31 +12,31 @@ FRONTEND (Next.js 16 + Tailwind v4 + shadcn/ui)
 
 BACKEND (Next.js API routes)
 ├── AI Intent Parser (Claude API → structured JSON)
-├── Route Engine (LI.FI SDK for cross-chain routing)
+├── Route Engine (LI.FI + Circle Bridge Kit)
 ├── ENS Resolver (viem — name resolution + payment preferences)
 └── x402 Client (detect HTTP 402 paywalls, auto-pay)
 
 ON-CHAIN (Foundry / Solidity)
-└── StableRouteHook (Uniswap v4 beforeSwap intent resolver)
+└── PayAgentHook (Uniswap v4 beforeSwap intent resolver)
 ```
 
 ## Features
 
 **AI Chat Interface** — Natural language → structured transaction intents via Claude API. Supports transfers, swaps, and autonomous payments.
 
-**Cross-Chain Routing (LI.FI)** — Finds optimal routes across Ethereum, Arbitrum, Base, and Optimism for USDC, USDT, and DAI. Compares fees and execution time.
+**Cross-Chain Routing** — Finds optimal routes across Ethereum, Arbitrum, Base, and Optimism. Circle Bridge Kit for USDC-native transfers, LI.FI for multi-token swaps.
 
-**ENS Resolution** — Resolves `.eth` names to addresses. Reads custom ENS text records (`com.stableroute.chain`, `com.stableroute.token`) for receiver payment preferences.
+**ENS Resolution** — Resolves `.eth` names to addresses. Reads custom ENS text records (`com.payagent.chain`, `com.payagent.token`) for receiver payment preferences.
 
-**x402 Autonomous Payments** — Detects HTTP 402 paywalled resources, extracts payment requirements, and handles payment automatically.
+**x402 Autonomous Payments** — Detects HTTP 402 paywalled resources, extracts payment requirements, and handles payment automatically via Circle Developer Wallets.
 
-**Uniswap v4 Hook** — `StableRouteHook` with `beforeSwap`/`afterSwap` hooks. An off-chain AI oracle sets routing recommendations per pool. Tracks swap count and volume analytics.
+**Uniswap v4 Hook** — `PayAgentHook` with `beforeSwap`/`afterSwap` hooks. AI-driven dynamic fees for same-chain stablecoin swaps.
 
 ## Demo Flows
 
-1. **Cross-chain transfer**: "Send 100 USDC to alice.eth on Arbitrum" — resolves ENS, finds LI.FI routes, compares fees, executes
-2. **Stablecoin swap**: "Swap 50 USDT to USDC" — shows both LI.FI and Uniswap v4 Hook routes side-by-side
-3. **Autonomous payment**: "Access /api/x402-demo" — detects 402 paywall, shows payment details, handles payment
+1. **Pay by name**: "pay vitalik.eth 100 USDC" — resolves ENS, finds cheapest route, executes
+2. **Cross-token payment**: "pay bob.eth 50 USDT" — swaps + bridges in one transaction via LI.FI Composer
+3. **Machine payment**: Agent hits 402 paywall → auto-pays with Circle wallet → gets data
 
 ## Getting Started
 
@@ -51,14 +49,9 @@ ON-CHAIN (Foundry / Solidity)
 ### Setup
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Configure environment
 cp .env.local.example .env.local
 # Fill in: ANTHROPIC_API_KEY, NEXT_PUBLIC_WC_PROJECT_ID, ETH_RPC_URL
-
-# Run development server
 pnpm dev
 ```
 
@@ -85,18 +78,11 @@ forge test -vv
 | Framework | Next.js 16 (App Router) |
 | Styling | Tailwind CSS v4 + shadcn/ui |
 | AI | Claude API (@anthropic-ai/sdk) |
-| Cross-chain | LI.FI SDK (@lifi/sdk) |
+| Cross-chain | LI.FI SDK + Circle Bridge Kit |
 | ENS | viem (getEnsAddress, getEnsText) |
 | Wallets | RainbowKit + wagmi v2 + viem |
 | x402 | HTTP 402 Payment Required protocol |
 | Contracts | Foundry + Uniswap v4-core/v4-periphery |
-
-## Prize Tracks
-
-- **Arc (Circle)** — Crosschain financial apps + agentic commerce with stablecoins
-- **Uniswap Foundation** — v4 hook for agentic finance
-- **LI.FI** — AI-powered cross-chain routing
-- **ENS** — Custom ENS resolution with payment preference records
 
 ## License
 

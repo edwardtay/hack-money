@@ -2,14 +2,14 @@
 pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
-import {StableRouteHook} from "../src/StableRouteHook.sol";
+import {PayAgentHook} from "../src/PayAgentHook.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 
-/// @title Deploy StableRouteHook to Sepolia
+/// @title Deploy PayAgentHook to Sepolia
 /// @notice Uses CREATE2 via the deterministic deployer to mine an address with correct hook flag bits.
 /// @dev Requires PRIVATE_KEY and ORACLE_ADDRESS env vars. Oracle defaults to deployer if not set.
-contract DeployStableRouteHook is Script {
+contract DeployPayAgentHook is Script {
     // Deterministic CREATE2 deployer — available on all major chains + testnets
     address constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
@@ -26,12 +26,12 @@ contract DeployStableRouteHook is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        // Default oracle to deployer (convenient for hackathon)
+        // Default oracle to deployer
         address oracle = vm.envOr("ORACLE_ADDRESS", deployer);
 
         // Build full init code (creation code + constructor args)
         bytes memory initCode = abi.encodePacked(
-            type(StableRouteHook).creationCode,
+            type(PayAgentHook).creationCode,
             abi.encode(IPoolManager(POOL_MANAGER), oracle)
         );
 
@@ -64,7 +64,7 @@ contract DeployStableRouteHook is Script {
         uint160 addrBits = uint160(expectedAddr);
         require(addrBits & FLAG_MASK == HOOK_FLAGS, "Hook flag bits mismatch");
 
-        console.log("Deployed StableRouteHook at:", expectedAddr);
+        console.log("Deployed PayAgentHook at:", expectedAddr);
     }
 
     /// @dev Iterate salts until we find one producing an address with the correct flag bits.

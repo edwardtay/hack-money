@@ -18,14 +18,14 @@ export default function Home() {
         <div className="flex items-center gap-3 min-w-0">
           {/* Title with glow */}
           <h1 className="text-xl font-semibold tracking-tight text-white relative shrink-0">
-            <span className="relative z-10">StableRoute</span>
+            <span className="relative z-10">PayAgent</span>
             <span className="absolute inset-0 blur-lg bg-indigo-500/20 rounded-full -z-0" />
           </h1>
 
           {/* Subtitle + sponsor badges (hidden on very small screens) */}
           <div className="hidden sm:flex items-center gap-2 min-w-0">
             <span className="text-xs text-gray-500 shrink-0">
-              AI-powered stablecoin routing
+              AI payment agent
             </span>
             <span className="text-gray-700 shrink-0">|</span>
             <div className="flex items-center gap-1.5 flex-wrap">

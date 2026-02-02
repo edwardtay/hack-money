@@ -26,7 +26,7 @@ const TOKEN_ADDRESSES: Record<string, Record<string, Address>> = {
   },
 }
 
-// Deployed StableRouteHook addresses per chain
+// Deployed PayAgentHook addresses per chain
 const HOOK_ADDRESSES: Record<string, Address> = {
   ethereum: '0x0000000000000000000000000000000000000000',
   base: '0x0000000000000000000000000000000000000000',
@@ -136,7 +136,7 @@ export function findV4Routes(params: {
   return [
     {
       id: `v4-${poolId.slice(0, 18)}`,
-      path: `${params.fromToken} → ${params.toToken} via StableRouteHook`,
+      path: `${params.fromToken} → ${params.toToken} via PayAgentHook`,
       fee: '$0.05',
       estimatedTime: '~15s',
       provider: 'Uniswap v4 Hook',

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {StableRouteHook} from "../src/StableRouteHook.sol";
+import {PayAgentHook} from "../src/PayAgentHook.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
@@ -14,17 +14,17 @@ import {BaseHook} from "@uniswap/v4-periphery/src/utils/BaseHook.sol";
 /// @notice Test harness that skips hook address validation during construction.
 /// In production, the contract must be deployed at an address with the correct flag bits.
 /// For testing, we bypass this check so we can deploy to any address.
-contract StableRouteHookHarness is StableRouteHook {
-    constructor(IPoolManager _poolManager, address _oracle) StableRouteHook(_poolManager, _oracle) {}
+contract PayAgentHookHarness is PayAgentHook {
+    constructor(IPoolManager _poolManager, address _oracle) PayAgentHook(_poolManager, _oracle) {}
 
     /// @dev Override to skip address validation in tests
     function validateHookAddress(BaseHook) internal pure override {}
 }
 
-contract StableRouteHookTest is Test {
+contract PayAgentHookTest is Test {
     using PoolIdLibrary for PoolKey;
 
-    StableRouteHookHarness public hook;
+    PayAgentHookHarness public hook;
     address public oracle = address(0xBEEF);
     address public poolManager = address(0xCAFE);
 
@@ -40,13 +40,13 @@ contract StableRouteHookTest is Test {
     function setUp() public {
         // Deploy the harness (which skips address validation) to a temporary address
         // then etch the bytecode to the correct hook address
-        StableRouteHookHarness impl = new StableRouteHookHarness(IPoolManager(poolManager), oracle);
+        PayAgentHookHarness impl = new PayAgentHookHarness(IPoolManager(poolManager), oracle);
 
         // Copy the runtime bytecode to the hook address with correct flag bits
         bytes memory code = address(impl).code;
         vm.etch(HOOK_ADDRESS, code);
 
-        hook = StableRouteHookHarness(HOOK_ADDRESS);
+        hook = PayAgentHookHarness(HOOK_ADDRESS);
 
         // Set the storage slots for immutable-like state
         // poolManager is stored as an immutable in the contract bytecode (already embedded from impl)
@@ -94,8 +94,8 @@ contract StableRouteHookTest is Test {
     }
 
     function test_Constructor_RevertsOnZeroOracle() public {
-        vm.expectRevert(StableRouteHook.ZeroAddressOracle.selector);
-        new StableRouteHookHarness(IPoolManager(poolManager), address(0));
+        vm.expectRevert(PayAgentHook.ZeroAddressOracle.selector);
+        new PayAgentHookHarness(IPoolManager(poolManager), address(0));
     }
 
     // ──────────────────────────────────────────────
@@ -124,7 +124,7 @@ contract StableRouteHookTest is Test {
         // Non-oracle should revert with Unauthorized custom error
         address nonOracle = address(0xDEAD);
         vm.prank(nonOracle);
-        vm.expectRevert(abi.encodeWithSelector(StableRouteHook.Unauthorized.selector, nonOracle));
+        vm.expectRevert(abi.encodeWithSelector(PayAgentHook.Unauthorized.selector, nonOracle));
         hook.setRouteRecommendation(poolId, 1);
     }
 
@@ -133,11 +133,11 @@ contract StableRouteHookTest is Test {
         PoolId poolId = key.toId();
 
         vm.prank(oracle);
-        vm.expectRevert(abi.encodeWithSelector(StableRouteHook.InvalidRecommendation.selector, uint8(2)));
+        vm.expectRevert(abi.encodeWithSelector(PayAgentHook.InvalidRecommendation.selector, uint8(2)));
         hook.setRouteRecommendation(poolId, 2);
 
         vm.prank(oracle);
-        vm.expectRevert(abi.encodeWithSelector(StableRouteHook.InvalidRecommendation.selector, uint8(255)));
+        vm.expectRevert(abi.encodeWithSelector(PayAgentHook.InvalidRecommendation.selector, uint8(255)));
         hook.setRouteRecommendation(poolId, 255);
     }
 
@@ -147,7 +147,7 @@ contract StableRouteHookTest is Test {
 
         vm.prank(oracle);
         vm.expectEmit(true, false, false, true);
-        emit StableRouteHook.RouteRecommendationUpdated(poolId, 1);
+        emit PayAgentHook.RouteRecommendationUpdated(poolId, 1);
         hook.setRouteRecommendation(poolId, 1);
     }
 
@@ -169,7 +169,7 @@ contract StableRouteHookTest is Test {
 
         vm.prank(oracle);
         vm.expectEmit(true, true, false, false);
-        emit StableRouteHook.OracleTransferred(oracle, newOracle);
+        emit PayAgentHook.OracleTransferred(oracle, newOracle);
         hook.transferOracle(newOracle);
     }
 
@@ -177,13 +177,13 @@ contract StableRouteHookTest is Test {
         address nonOracle = address(0xDEAD);
 
         vm.prank(nonOracle);
-        vm.expectRevert(abi.encodeWithSelector(StableRouteHook.Unauthorized.selector, nonOracle));
+        vm.expectRevert(abi.encodeWithSelector(PayAgentHook.Unauthorized.selector, nonOracle));
         hook.transferOracle(address(0xFACE));
     }
 
     function test_TransferOracle_RevertsOnZeroAddress() public {
         vm.prank(oracle);
-        vm.expectRevert(StableRouteHook.ZeroAddressOracle.selector);
+        vm.expectRevert(PayAgentHook.ZeroAddressOracle.selector);
         hook.transferOracle(address(0));
     }
 
@@ -203,7 +203,7 @@ contract StableRouteHookTest is Test {
 
         // Old oracle can no longer act
         vm.prank(oracle);
-        vm.expectRevert(abi.encodeWithSelector(StableRouteHook.Unauthorized.selector, oracle));
+        vm.expectRevert(abi.encodeWithSelector(PayAgentHook.Unauthorized.selector, oracle));
         hook.setRouteRecommendation(poolId, 0);
     }
 
