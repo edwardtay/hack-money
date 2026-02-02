@@ -24,6 +24,11 @@ const TOKEN_ADDRESSES: Record<string, Record<string, Address>> = {
     USDT: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58',
     DAI: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
   },
+  unichain: {
+    USDC: '0x0000000000000000000000000000000000000000', // Placeholder — update after Unichain Sepolia token deploy
+    USDT: '0x0000000000000000000000000000000000000000',
+    DAI: '0x0000000000000000000000000000000000000000',
+  },
 }
 
 // Deployed PayAgentHook addresses per chain
@@ -32,6 +37,7 @@ const HOOK_ADDRESSES: Record<string, Address> = {
   base: '0x0000000000000000000000000000000000000000',
   arbitrum: '0x0000000000000000000000000000000000000000',
   optimism: '0x0000000000000000000000000000000000000000',
+  unichain: '0x0000000000000000000000000000000000000000', // Update after Unichain Sepolia deploy
 }
 
 // Default pool parameters for stablecoin pairs
@@ -40,6 +46,34 @@ const STABLE_TICK_SPACING = 1
 
 // Minimum pool liquidity (in token units) required to recommend the v4 route
 const MIN_POOL_LIQUIDITY = BigInt(1000) // $1,000 minimum
+
+// Dynamic fee tiers set by the AI oracle (in hundredths of a bip)
+// These mirror the on-chain poolFeeOverride values from PayAgentHook.sol
+const DYNAMIC_FEE_TIERS = {
+  stable: 100,    // 0.01% — stablecoin pairs (USDC/USDT, DAI/USDC, etc.)
+  low: 500,       // 0.05% — low-volatility pairs
+  medium: 3000,   // 0.30% — standard pairs
+  high: 10000,    // 1.00% — volatile pairs
+} as const
+
+/**
+ * Determine the dynamic fee tier for a token pair.
+ * The AI oracle sets this on-chain via setPoolFee(); this mirrors the logic client-side.
+ */
+function getDynamicFeeTier(fromToken: string, toToken: string): {
+  feeBps: number
+  tier: keyof typeof DYNAMIC_FEE_TIERS
+} {
+  const from = fromToken.toUpperCase()
+  const to = toToken.toUpperCase()
+  const stableSet = new Set(['USDC', 'USDT', 'DAI', 'FRAX', 'LUSD', 'GHO'])
+
+  if (stableSet.has(from) && stableSet.has(to)) {
+    return { feeBps: DYNAMIC_FEE_TIERS.stable, tier: 'stable' }
+  }
+  // Default to medium for non-stable pairs routed through v4
+  return { feeBps: DYNAMIC_FEE_TIERS.medium, tier: 'medium' }
+}
 
 /**
  * Compute a Uniswap v4 PoolId from PoolKey components.
@@ -78,6 +112,14 @@ export function computePoolId(params: {
  */
 function sortTokens(a: Address, b: Address): [Address, Address] {
   return BigInt(a) < BigInt(b) ? [a, b] : [b, a]
+}
+
+/**
+ * Format a fee in hundredths-of-a-bip into a human-readable percentage string.
+ * e.g., 100 -> "0.01%", 3000 -> "0.30%", 10000 -> "1.00%"
+ */
+function formatFeePercent(feeBps: number): string {
+  return `${(feeBps / 10000).toFixed(2)}%`
 }
 
 export function findV4Routes(params: {
@@ -123,6 +165,9 @@ export function findV4Routes(params: {
     return []
   }
 
+  // Determine the dynamic fee tier for this pair
+  const { feeBps, tier } = getDynamicFeeTier(params.fromToken, params.toToken)
+
   // Compute the pool ID dynamically from the PoolKey
   const [currency0, currency1] = sortTokens(fromAddr, toAddr)
   const poolId = computePoolId({
@@ -136,10 +181,17 @@ export function findV4Routes(params: {
   return [
     {
       id: `v4-${poolId.slice(0, 18)}`,
-      path: `${params.fromToken} → ${params.toToken} via PayAgentHook`,
-      fee: '$0.05',
+      path: `${params.fromToken} -> ${params.toToken} via PayAgentHook (${tier} fee: ${formatFeePercent(feeBps)})`,
+      fee: `$${(parseFloat(params.amount) * feeBps / 1_000_000).toFixed(2)}`,
       estimatedTime: '~15s',
-      provider: 'Uniswap v4 Hook',
-    },
+      provider: 'Uniswap v4 + PayAgent Dynamic Fee Hook',
+      hookData: {
+        hookAddress,
+        poolId,
+        dynamicFeeBps: feeBps,
+        feeTier: tier,
+        oracleManaged: true,
+      },
+    } as RouteOption & { hookData: Record<string, unknown> },
   ]
 }

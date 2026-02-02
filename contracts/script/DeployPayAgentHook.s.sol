@@ -6,18 +6,28 @@ import {PayAgentHook} from "../src/PayAgentHook.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 
-/// @title Deploy PayAgentHook to Sepolia
+/// @title Deploy PayAgentHook to Unichain Sepolia
 /// @notice Uses CREATE2 via the deterministic deployer to mine an address with correct hook flag bits.
 /// @dev Requires PRIVATE_KEY and ORACLE_ADDRESS env vars. Oracle defaults to deployer if not set.
+///
+/// Target chain: Unichain Sepolia (Chain ID 1301)
+/// RPC: https://sepolia.unichain.org
+/// Explorer: https://sepolia.uniscan.xyz
 contract DeployPayAgentHook is Script {
     // Deterministic CREATE2 deployer — available on all major chains + testnets
     address constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
-    // Uniswap V4 PoolManager on Sepolia
+    // Uniswap V4 PoolManager on Unichain Sepolia (Chain ID 1301)
+    // This is the canonical v4 PoolManager address deployed across all supported chains.
     address constant POOL_MANAGER = 0x000000000004444c5dc75cB358380D2e3dE08A90;
 
-    // beforeSwap (bit 7) + afterSwap (bit 6) = 0x00C0
-    uint160 constant HOOK_FLAGS = uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG);
+    // Expected chain ID for Unichain Sepolia
+    uint256 constant UNICHAIN_SEPOLIA_CHAIN_ID = 1301;
+
+    // afterInitialize (bit 12) + beforeSwap (bit 7) + afterSwap (bit 6) = 0x10C0
+    uint160 constant HOOK_FLAGS = uint160(
+        Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG
+    );
 
     // Mask for the 14 least-significant bits (hook permission flags)
     uint160 constant FLAG_MASK = 0x3FFF;
@@ -25,6 +35,12 @@ contract DeployPayAgentHook is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
+
+        // Verify we are deploying to Unichain Sepolia
+        require(
+            block.chainid == UNICHAIN_SEPOLIA_CHAIN_ID,
+            "Wrong chain: expected Unichain Sepolia (1301)"
+        );
 
         // Default oracle to deployer
         address oracle = vm.envOr("ORACLE_ADDRESS", deployer);
@@ -38,11 +54,12 @@ contract DeployPayAgentHook is Script {
         bytes32 initCodeHash = keccak256(initCode);
 
         // Mine a salt whose CREATE2 address has exactly the right flag bits
-        console.log("Mining CREATE2 salt for hook flags 0x00C0 ...");
+        console.log("Mining CREATE2 salt for hook flags 0x10C0 ...");
         bytes32 salt = _mineSalt(initCodeHash);
         address expectedAddr = _computeAddress(salt, initCodeHash);
 
         console.log("------------------------------------");
+        console.log("Chain       : Unichain Sepolia (1301)");
         console.log("PoolManager :", POOL_MANAGER);
         console.log("Oracle      :", oracle);
         console.log("Deployer    :", deployer);
