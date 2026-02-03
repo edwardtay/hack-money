@@ -41,6 +41,7 @@ yarn-error.log*
 contracts/node_modules
 contracts/out
 contracts/cache
+contracts/broadcast
 
 # typescript
 *.tsbuildinfo

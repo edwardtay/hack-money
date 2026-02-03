@@ -4,6 +4,7 @@ out = "out"
 libs = ["lib", "node_modules", "../node_modules"]
 solc = "0.8.26"
 evm_version = "cancun"
+via_ir = true
 
 [profile.default.fmt]
 bracket_spacing = true
