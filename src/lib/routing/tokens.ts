@@ -5,6 +5,7 @@ export const CHAIN_MAP: Record<string, number> = {
   arbitrum: ChainId.ARB,
   base: ChainId.BAS,
   optimism: ChainId.OPT,
+  unichain: 1301,
 }
 
 export const TOKEN_MAP: Record<string, { decimals: number; addresses: Record<number, string> }> = {
@@ -56,6 +57,38 @@ export const TOKEN_MAP: Record<string, { decimals: number; addresses: Record<num
     addresses: {
       [ChainId.ETH]: '0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f',
       [ChainId.ARB]: '0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33',
+    },
+  },
+  ETH: {
+    decimals: 18,
+    addresses: {
+      [ChainId.ETH]: '0x0000000000000000000000000000000000000000',
+      [ChainId.ARB]: '0x0000000000000000000000000000000000000000',
+      [ChainId.BAS]: '0x0000000000000000000000000000000000000000',
+      [ChainId.OPT]: '0x0000000000000000000000000000000000000000',
+    },
+  },
+  WETH: {
+    decimals: 18,
+    addresses: {
+      [ChainId.ETH]: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+      [ChainId.ARB]: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+      [ChainId.BAS]: '0x4200000000000000000000000000000000000006',
+      [ChainId.OPT]: '0x4200000000000000000000000000000000000006',
+    },
+  },
+  cbBTC: {
+    decimals: 8,
+    addresses: {
+      [ChainId.ETH]: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
+      [ChainId.BAS]: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
+    },
+  },
+  WBTC: {
+    decimals: 8,
+    addresses: {
+      [ChainId.ETH]: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+      [ChainId.ARB]: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
     },
   },
 }
@@ -116,14 +149,40 @@ export function isVaultToken(address: string): boolean {
 export const SUPPORTED_TOKENS = Object.keys(TOKEN_MAP)
 
 /** Tokens considered stablecoins for v4 hook eligibility */
-export const STABLECOINS = SUPPORTED_TOKENS
+export const STABLECOINS = ['USDC', 'USDT', 'DAI', 'FRAX', 'LUSD', 'GHO']
+
+/** Case-insensitive lookup into TOKEN_MAP */
+function findTokenEntry(symbol: string) {
+  const upper = symbol.toUpperCase()
+  if (TOKEN_MAP[upper]) return TOKEN_MAP[upper]
+  for (const [key, value] of Object.entries(TOKEN_MAP)) {
+    if (key.toUpperCase() === upper) return value
+  }
+  return undefined
+}
 
 /** Look up a token address on a specific chain. Returns undefined if not available. */
 export function getTokenAddress(symbol: string, chainId: number): string | undefined {
-  return TOKEN_MAP[symbol.toUpperCase()]?.addresses[chainId]
+  return findTokenEntry(symbol)?.addresses[chainId]
 }
+
+/** Return the first chain ID where this token is available, preferring Base. */
+export function getPreferredChainForToken(symbol: string): number | undefined {
+  const entry = findTokenEntry(symbol)
+  if (!entry) return undefined
+  const chainIds = Object.keys(entry.addresses).map(Number)
+  // Prefer Base, then Ethereum, then whatever is available
+  if (chainIds.includes(ChainId.BAS)) return ChainId.BAS
+  if (chainIds.includes(ChainId.ETH)) return ChainId.ETH
+  return chainIds[0]
+}
+
+/** Reverse lookup: chain ID → chain name */
+export const CHAIN_ID_TO_NAME: Record<number, string> = Object.fromEntries(
+  Object.entries(CHAIN_MAP).map(([name, id]) => [id, name])
+)
 
 /** Get the decimals for a token symbol. Defaults to 18 if unknown. */
 export function getTokenDecimals(symbol: string): number {
-  return TOKEN_MAP[symbol.toUpperCase()]?.decimals ?? 18
+  return findTokenEntry(symbol)?.decimals ?? 18
 }

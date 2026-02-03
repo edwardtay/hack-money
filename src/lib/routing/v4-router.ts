@@ -1,79 +1,113 @@
 import { keccak256, encodeAbiParameters, type Address } from 'viem'
 import type { RouteOption } from '@/lib/types'
-import { STABLECOINS } from './tokens'
 
-// Stablecoin addresses per chain (checksummed)
-const TOKEN_ADDRESSES: Record<string, Record<string, Address>> = {
-  ethereum: {
-    USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-    USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-    DAI: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
-  },
+// ---------------------------------------------------------------------------
+// Token categories
+// ---------------------------------------------------------------------------
+
+export type TokenCategory = 'stable' | 'bluechip'
+
+export type V4TokenConfig = {
+  address: Address
+  decimals: number
+  category: TokenCategory
+}
+
+export type V4ChainConfig = {
+  hook: Address
+  universalRouter: Address
+  permit2: Address
+  poolManager: Address
+  chainId: number
+  tokens: Record<string, V4TokenConfig>
+}
+
+// ---------------------------------------------------------------------------
+// Per-chain V4 configuration
+// ---------------------------------------------------------------------------
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address
+
+export const V4_CHAINS: Record<string, V4ChainConfig> = {
   base: {
-    USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    USDT: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2',
-    DAI: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
-  },
-  arbitrum: {
-    USDC: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
-    USDT: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
-    DAI: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
-  },
-  optimism: {
-    USDC: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
-    USDT: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58',
-    DAI: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
+    hook: '0xA5Cb63B540D4334F01346F3D4C51d5B2fFf050c0',
+    universalRouter: '0x6ff5693b99212da76ad316178a184ab56d299b43',
+    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    poolManager: '0x498581fF718922c3f8e6A244956aF099B2652b2b',
+    chainId: 8453,
+    tokens: {
+      USDC:  { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6,  category: 'stable' },
+      USDT:  { address: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2', decimals: 6,  category: 'stable' },
+      DAI:   { address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', decimals: 18, category: 'stable' },
+      WETH:  { address: '0x4200000000000000000000000000000000000006', decimals: 18, category: 'bluechip' },
+      cbBTC: { address: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf', decimals: 8,  category: 'bluechip' },
+    },
   },
   unichain: {
-    USDC: '0x0000000000000000000000000000000000000000', // Placeholder — update after Unichain Sepolia token deploy
-    USDT: '0x0000000000000000000000000000000000000000',
-    DAI: '0x0000000000000000000000000000000000000000',
+    hook: '0x2204fc852739D04254d3bc97451f905a458910c0',
+    universalRouter: '0x0000000000000000000000000000000000000000', // TBD — update after Unichain Sepolia deploy
+    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    poolManager: '0x0000000000000000000000000000000000000000', // TBD
+    chainId: 1301,
+    tokens: {
+      USDC: { address: '0x0000000000000000000000000000000000000000', decimals: 6,  category: 'stable' },
+      USDT: { address: '0x0000000000000000000000000000000000000000', decimals: 6,  category: 'stable' },
+      DAI:  { address: '0x0000000000000000000000000000000000000000', decimals: 18, category: 'stable' },
+    },
   },
 }
 
-// Deployed PayAgentHook addresses per chain
-const HOOK_ADDRESSES: Record<string, Address> = {
-  ethereum: '0x0000000000000000000000000000000000000000',
-  base: '0x0000000000000000000000000000000000000000',
-  arbitrum: '0x0000000000000000000000000000000000000000',
-  optimism: '0x0000000000000000000000000000000000000000',
-  unichain: '0x0000000000000000000000000000000000000000', // Update after Unichain Sepolia deploy
+// ---------------------------------------------------------------------------
+// Pair classification & defaults
+// ---------------------------------------------------------------------------
+
+type PairType = 'stable' | 'bluechip' | 'mixed'
+
+type PairDefaults = {
+  pairType: PairType
+  feeBps: number        // hundredths of a bip (100 = 0.01%)
+  tickSpacing: number
+  slippage: number      // fraction, e.g. 0.003 = 0.3%
 }
 
-// Default pool parameters for stablecoin pairs
-const STABLE_POOL_FEE = 100 // 0.01% fee tier for stablecoins
-const STABLE_TICK_SPACING = 1
+const PAIR_DEFAULTS: Record<PairType, Omit<PairDefaults, 'pairType'>> = {
+  stable:   { feeBps: 100,  tickSpacing: 1,  slippage: 0.003 },
+  bluechip: { feeBps: 500,  tickSpacing: 60, slippage: 0.02 },
+  mixed:    { feeBps: 3000, tickSpacing: 60, slippage: 0.02 },
+}
+
+function classifyPair(catA: TokenCategory, catB: TokenCategory): PairType {
+  if (catA === 'stable' && catB === 'stable') return 'stable'
+  if (catA === 'bluechip' && catB === 'bluechip') return 'bluechip'
+  return 'mixed'
+}
+
+export function getPairDefaults(
+  chain: string,
+  fromSymbol: string,
+  toSymbol: string,
+): PairDefaults | undefined {
+  const cfg = V4_CHAINS[chain]
+  if (!cfg) return undefined
+  const fromTok = cfg.tokens[fromSymbol.toUpperCase()]
+  const toTok = cfg.tokens[toSymbol.toUpperCase()]
+  if (!fromTok || !toTok) return undefined
+  const pairType = classifyPair(fromTok.category, toTok.category)
+  return { pairType, ...PAIR_DEFAULTS[pairType] }
+}
+
+// ---------------------------------------------------------------------------
+// Pool ID computation
+// ---------------------------------------------------------------------------
+
+// Dynamic fee flag used on-chain by PayAgentHook
+const DYNAMIC_FEE_FLAG = 0x800000
 
 // Minimum pool liquidity (in token units) required to recommend the v4 route
 const MIN_POOL_LIQUIDITY = BigInt(1000) // $1,000 minimum
 
-// Dynamic fee tiers set by the AI oracle (in hundredths of a bip)
-// These mirror the on-chain poolFeeOverride values from PayAgentHook.sol
-const DYNAMIC_FEE_TIERS = {
-  stable: 100,    // 0.01% — stablecoin pairs (USDC/USDT, DAI/USDC, etc.)
-  low: 500,       // 0.05% — low-volatility pairs
-  medium: 3000,   // 0.30% — standard pairs
-  high: 10000,    // 1.00% — volatile pairs
-} as const
-
-/**
- * Determine the dynamic fee tier for a token pair.
- * The AI oracle sets this on-chain via setPoolFee(); this mirrors the logic client-side.
- */
-function getDynamicFeeTier(fromToken: string, toToken: string): {
-  feeBps: number
-  tier: keyof typeof DYNAMIC_FEE_TIERS
-} {
-  const from = fromToken.toUpperCase()
-  const to = toToken.toUpperCase()
-  const stableSet = new Set(['USDC', 'USDT', 'DAI', 'FRAX', 'LUSD', 'GHO'])
-
-  if (stableSet.has(from) && stableSet.has(to)) {
-    return { feeBps: DYNAMIC_FEE_TIERS.stable, tier: 'stable' }
-  }
-  // Default to medium for non-stable pairs routed through v4
-  return { feeBps: DYNAMIC_FEE_TIERS.medium, tier: 'medium' }
-}
+// PAXG (gold token) — Ethereum mainnet only, used for display in consolidation flows
+export const PAXG_ADDRESS = '0x45804880De22913dAFE09f4980848ECE6EcbAf78' as const
 
 /**
  * Compute a Uniswap v4 PoolId from PoolKey components.
@@ -122,6 +156,10 @@ function formatFeePercent(feeBps: number): string {
   return `${(feeBps / 10000).toFixed(2)}%`
 }
 
+// ---------------------------------------------------------------------------
+// Route finder
+// ---------------------------------------------------------------------------
+
 export function findV4Routes(params: {
   fromChain: string
   toChain: string
@@ -130,32 +168,27 @@ export function findV4Routes(params: {
   amount: string
   poolLiquidity?: bigint
 }): RouteOption[] {
-  // Only offer v4 route for same-chain stablecoin-to-stablecoin swaps
+  // Only same-chain swaps
   const isSameChain = params.fromChain === params.toChain || !params.toChain
-  const isStablePair =
-    STABLECOINS.includes(params.fromToken?.toUpperCase()) &&
-    STABLECOINS.includes(params.toToken?.toUpperCase())
-  const isDifferentToken =
-    params.fromToken?.toUpperCase() !== params.toToken?.toUpperCase()
+  if (!isSameChain) return []
 
-  if (!isSameChain || !isStablePair || !isDifferentToken) {
-    return []
-  }
+  const chain = params.fromChain || 'base'
+  const cfg = V4_CHAINS[chain]
+  if (!cfg) return []
 
-  const chain = params.fromChain || 'ethereum'
-  const chainTokens = TOKEN_ADDRESSES[chain]
-  const hookAddress = HOOK_ADDRESSES[chain]
+  // Hook must be deployed (non-zero)
+  if (cfg.hook === ZERO_ADDRESS) return []
 
-  if (!chainTokens || !hookAddress) {
-    return []
-  }
+  const fromSymbol = params.fromToken?.toUpperCase()
+  const toSymbol = params.toToken?.toUpperCase()
+  if (!fromSymbol || !toSymbol || fromSymbol === toSymbol) return []
 
-  const fromAddr = chainTokens[params.fromToken.toUpperCase()]
-  const toAddr = chainTokens[params.toToken.toUpperCase()]
+  const fromTok = cfg.tokens[fromSymbol]
+  const toTok = cfg.tokens[toSymbol]
+  if (!fromTok || !toTok) return []
 
-  if (!fromAddr || !toAddr) {
-    return []
-  }
+  // Both token addresses must be deployed (non-zero)
+  if (fromTok.address === ZERO_ADDRESS || toTok.address === ZERO_ADDRESS) return []
 
   // Validate pool liquidity meets minimum threshold
   if (
@@ -165,31 +198,33 @@ export function findV4Routes(params: {
     return []
   }
 
-  // Determine the dynamic fee tier for this pair
-  const { feeBps, tier } = getDynamicFeeTier(params.fromToken, params.toToken)
+  // Derive pair defaults from token categories
+  const pairType = classifyPair(fromTok.category, toTok.category)
+  const defaults = PAIR_DEFAULTS[pairType]
 
   // Compute the pool ID dynamically from the PoolKey
-  const [currency0, currency1] = sortTokens(fromAddr, toAddr)
+  const [currency0, currency1] = sortTokens(fromTok.address, toTok.address)
   const poolId = computePoolId({
     currency0,
     currency1,
-    fee: STABLE_POOL_FEE,
-    tickSpacing: STABLE_TICK_SPACING,
-    hooks: hookAddress,
+    fee: DYNAMIC_FEE_FLAG,
+    tickSpacing: defaults.tickSpacing,
+    hooks: cfg.hook,
   })
 
   return [
     {
       id: `v4-${poolId.slice(0, 18)}`,
-      path: `${params.fromToken} -> ${params.toToken} via PayAgentHook (${tier} fee: ${formatFeePercent(feeBps)})`,
-      fee: `$${(parseFloat(params.amount) * feeBps / 1_000_000).toFixed(2)}`,
+      path: `${params.fromToken} -> ${params.toToken} via PayAgentHook (${pairType} fee: ${formatFeePercent(defaults.feeBps)})`,
+      fee: `$${(parseFloat(params.amount) * defaults.feeBps / 1_000_000).toFixed(2)}`,
       estimatedTime: '~15s',
       provider: 'Uniswap v4 + PayAgent Dynamic Fee Hook',
       hookData: {
-        hookAddress,
+        hookAddress: cfg.hook,
         poolId,
-        dynamicFeeBps: feeBps,
-        feeTier: tier,
+        dynamicFeeBps: defaults.feeBps,
+        feeTier: pairType,
+        tickSpacing: defaults.tickSpacing,
         oracleManaged: true,
       },
     } as RouteOption & { hookData: Record<string, unknown> },
