@@ -55,8 +55,8 @@ export default function LandingPage() {
             </div>
             <div className="w-px h-8 bg-[#E4E2DC]" />
             <div>
-              <p className="text-2xl font-semibold text-[#1C1B18]">4</p>
-              <p className="text-[#9C9B93]">Chains</p>
+              <p className="text-2xl font-semibold text-[#1C1B18]">Any</p>
+              <p className="text-[#9C9B93]">Chain</p>
             </div>
           </div>
         </div>
