@@ -187,6 +187,7 @@ export function ReceiverDashboard() {
   const [customVault, setCustomVault] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveTxHash, setSaveTxHash] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [requestAmount, setRequestAmount] = useState('')
@@ -217,6 +218,7 @@ export function ReceiverDashboard() {
 
     setSaving(true)
     setSaveSuccess(false)
+    setSaveTxHash(null)
     setSaveError(null)
 
     try {
@@ -238,12 +240,13 @@ export function ReceiverDashboard() {
 
       const txData = await res.json()
 
-      await sendTransactionAsync({
+      const hash = await sendTransactionAsync({
         to: txData.to as `0x${string}`,
         data: txData.data as `0x${string}`,
         value: BigInt(txData.value || 0),
       })
 
+      setSaveTxHash(hash)
       setSaveSuccess(true)
     } catch (err: unknown) {
       const errMessage = err instanceof Error ? err.message : 'Transaction failed'
@@ -331,24 +334,97 @@ export function ReceiverDashboard() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-      {/* ENS Header with Status */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#1C1B18]">{ensName}</h1>
-          <p className="text-sm text-[#6B6960]">Your AcceptAny configuration</p>
-        </div>
-        {currentVault ? (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#EDF5F0] border border-[#B7D4C7]">
-            <span className="w-2 h-2 rounded-full bg-[#22C55E]" />
-            <span className="text-xs font-medium text-[#2D6A4F]">ENS Configured</span>
+      {/* ENS Info Card */}
+      <Card className="border-[#E4E2DC] bg-white">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-4">
+            {/* ENS Avatar or Placeholder */}
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#627EEA] to-[#C99FFF] flex items-center justify-center flex-shrink-0">
+              <span className="text-xl font-bold text-white">
+                {ensName?.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <h1 className="text-xl font-semibold text-[#1C1B18]">{ensName}</h1>
+                {currentVault ? (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#EDF5F0] border border-[#B7D4C7]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
+                    <span className="text-xs font-medium text-[#2D6A4F]">Configured</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#FFF3E0] border border-[#FFCC80]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#F57C00]" />
+                    <span className="text-xs font-medium text-[#E65100]">Not Set</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs font-mono text-[#6B6960] mt-1">
+                {address?.slice(0, 6)}...{address?.slice(-4)}
+              </p>
+
+              {/* ENS Records */}
+              <div className="mt-3 pt-3 border-t border-[#E4E2DC] space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[#6B6960]">yieldroute.vault</span>
+                  {currentVault ? (
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-[#1C1B18]">
+                        {currentVault.slice(0, 6)}...{currentVault.slice(-4)}
+                      </span>
+                      <a
+                        href={`https://basescan.org/address/${currentVault}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#627EEA] hover:underline"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                          <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </a>
+                    </div>
+                  ) : (
+                    <span className="text-[#9C9B93] italic">not set</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[#6B6960]">Vault Chain</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded-full bg-[#0052FF] flex items-center justify-center">
+                      <span className="text-[8px] font-bold text-white">B</span>
+                    </div>
+                    <span className="text-[#1C1B18]">Base</span>
+                    <span className="text-[#9C9B93] text-xs">(8453)</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[#6B6960]">ENS Record Chain</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded-full bg-[#627EEA] flex items-center justify-center">
+                      <span className="text-[8px] font-bold text-white">E</span>
+                    </div>
+                    <span className="text-[#1C1B18]">Ethereum</span>
+                    <span className="text-[#9C9B93] text-xs">(1)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* View on ENS link */}
+              <a
+                href={`https://app.ens.domains/${ensName}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-[#627EEA] hover:underline mt-3"
+              >
+                View on ENS
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                  <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </a>
+            </div>
           </div>
-        ) : (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FFF3E0] border border-[#FFCC80]">
-            <span className="w-2 h-2 rounded-full bg-[#F57C00]" />
-            <span className="text-xs font-medium text-[#E65100]">Not Configured</span>
-          </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Yield Vault Selection - First */}
       <Card className="border-[#E4E2DC] bg-white">
@@ -459,11 +535,38 @@ export function ReceiverDashboard() {
           )}
 
           {saveSuccess && (
-            <div className="flex items-center gap-2 text-sm text-[#22C55E] mt-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Vault saved to ENS!
+            <div className="rounded-lg bg-[#EDF5F0] border border-[#B7D4C7] p-4 mt-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#22C55E] flex items-center justify-center flex-shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-white">
+                    <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#2D6A4F]">
+                    Vault saved to ENS!
+                  </p>
+                  <p className="text-xs text-[#2D6A4F]/70 mt-1">
+                    <span className="font-medium">Record:</span> yieldroute.vault → {selectedVault?.name || 'Custom Vault'} (Base)
+                  </p>
+                  <p className="text-xs text-[#2D6A4F]/70">
+                    <span className="font-medium">Stored on:</span> Ethereum mainnet (ENS)
+                  </p>
+                  {saveTxHash && (
+                    <a
+                      href={`https://etherscan.io/tx/${saveTxHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-[#2D6A4F] hover:underline mt-2"
+                    >
+                      View on Etherscan
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                        <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </a>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
