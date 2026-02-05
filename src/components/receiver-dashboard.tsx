@@ -883,7 +883,7 @@ export function ReceiverDashboard() {
             )}
             <h1 className="text-2xl font-semibold text-white">{ensName}</h1>
           </div>
-          <p className="text-white/70 text-sm">Share this link to get paid in any token</p>
+          <p className="text-white/70 text-sm">Get paid and generate yield automatically</p>
         </div>
 
         <CardContent className="p-6">
