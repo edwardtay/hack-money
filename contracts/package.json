@@ -4,6 +4,7 @@
     "test": "/home/edwardtay/.foundry/bin/forge test -vv"
   },
   "dependencies": {
+    "@gelatonetwork/relay-context": "^4.1.1",
     "@uniswap/v4-core": "^1.0.2",
     "@uniswap/v4-periphery": "^1.0.3",
     "forge-std": "github:foundry-rs/forge-std"
