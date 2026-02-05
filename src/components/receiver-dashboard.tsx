@@ -381,6 +381,9 @@ export function ReceiverDashboard() {
   const [multiVaultError, setMultiVaultError] = useState<string | null>(null)
   const [multiVaultTxHash, setMultiVaultTxHash] = useState<string | null>(null)
 
+  // State for showing advanced options (collapsed by default for first-time users)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
   // Sync multi-vault state with on-chain config
   useEffect(() => {
     if (smartVaultConfig && smartVaultConfig.allocations.length > 0) {
@@ -856,110 +859,40 @@ export function ReceiverDashboard() {
   const basePaymentLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/pay/${ensName}`
   const paymentLink = requestAmount ? `${basePaymentLink}?amount=${requestAmount}` : basePaymentLink
 
+  // Determine current strategy display
+  const currentStrategyDisplay = currentStrategies
+    ? 'Multi-strategy'
+    : currentStrategy === 'restaking'
+    ? 'Restaking (Renzo)'
+    : currentStrategy === 'liquid'
+    ? 'Liquid USDC'
+    : 'Yield (Aave)'
+
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-      {/* ENS Info Card */}
-      <Card className="border-[#E4E2DC] bg-white">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-4">
-            {/* ENS Avatar or Placeholder */}
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+      {/* HERO: Payment Link - The Main Action */}
+      <Card className="border-[#E4E2DC] bg-white overflow-hidden">
+        <div className="bg-gradient-to-br from-[#1C1B18] to-[#2D2C28] p-6 text-center">
+          <div className="flex items-center justify-center gap-3 mb-2">
             {ensAvatar ? (
-              <img
-                src={ensAvatar}
-                alt={ensName || 'ENS Avatar'}
-                className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
-              />
+              <img src={ensAvatar} alt="" className="w-10 h-10 rounded-full object-cover" />
             ) : (
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#627EEA] to-[#C99FFF] flex items-center justify-center flex-shrink-0">
-                <span className="text-xl font-bold text-white">
-                  {ensName?.charAt(0).toUpperCase()}
-                </span>
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <span className="text-lg font-bold text-white">{ensName?.charAt(0).toUpperCase()}</span>
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <h1 className="text-xl font-semibold text-[#1C1B18]">{ensName}</h1>
-                {currentVault ? (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#EDF5F0] border border-[#B7D4C7]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
-                    <span className="text-xs font-medium text-[#2D6A4F]">Configured</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#FFF3E0] border border-[#FFCC80]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#F57C00]" />
-                    <span className="text-xs font-medium text-[#E65100]">Not Set</span>
-                  </div>
-                )}
-              </div>
-              <p className="text-xs font-mono text-[#6B6960] mt-1">
-                {address?.slice(0, 6)}...{address?.slice(-4)}
-              </p>
-              {ensDescription && (
-                <p className="text-sm text-[#6B6960] mt-1">{ensDescription}</p>
-              )}
-
-              {/* ENS Records */}
-              <div className="mt-3 pt-3 border-t border-[#E4E2DC] space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-[#6B6960]">yieldroute.vault</span>
-                  {currentVault ? (
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-[#1C1B18]">
-                        {currentVault.slice(0, 6)}...{currentVault.slice(-4)}
-                      </span>
-                      <a
-                        href={`https://basescan.org/address/${currentVault}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[#627EEA] hover:underline"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                          <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </a>
-                    </div>
-                  ) : (
-                    <span className="text-[#9C9B93] italic">not set</span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-[#6B6960]">Vault Chain</span>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded-full bg-[#0052FF] flex items-center justify-center">
-                      <span className="text-[8px] font-bold text-white">B</span>
-                    </div>
-                    <span className="text-[#1C1B18]">Base</span>
-                    <span className="text-[#9C9B93] text-xs">(8453)</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* View on ENS link */}
-              <a
-                href={`https://app.ens.domains/${ensName}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-[#627EEA] hover:underline mt-3"
-              >
-                View on ENS
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                  <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </a>
-            </div>
+            <h1 className="text-2xl font-semibold text-white">{ensName}</h1>
           </div>
-        </CardContent>
-      </Card>
+          <p className="text-white/70 text-sm">Share this link to get paid in any token</p>
+        </div>
 
-      {/* Payment Link - Share this! */}
-      <Card className="border-[#E4E2DC] bg-white">
         <CardContent className="p-6">
-          <div className="flex gap-6">
-            {/* QR Code - left side */}
-            <div className="p-3 bg-white rounded-xl border border-[#E4E2DC] flex-shrink-0">
+          <div className="flex flex-col sm:flex-row gap-6 items-center">
+            {/* QR Code */}
+            <div className="p-3 bg-white rounded-xl border border-[#E4E2DC] shadow-sm">
               <QRCodeSVG
                 value={paymentLink}
-                size={120}
+                size={140}
                 level="M"
                 includeMargin={false}
                 bgColor="#FFFFFF"
@@ -967,50 +900,47 @@ export function ReceiverDashboard() {
               />
             </div>
 
-            {/* Right side - link and actions */}
-            <div className="flex-1 min-w-0 flex flex-col justify-between">
-              {/* Link display */}
-              <div>
-                <p className="text-xs text-[#6B6960] mb-1">Payment Link</p>
-                <p className="font-mono text-sm text-[#1C1B18] truncate">
-                  {paymentLink}
-                </p>
+            {/* Link & Actions */}
+            <div className="flex-1 w-full space-y-4">
+              {/* Payment link display */}
+              <div className="p-3 bg-[#F8F7F4] rounded-lg">
+                <p className="text-xs text-[#6B6960] mb-1">Your payment link</p>
+                <p className="font-mono text-sm text-[#1C1B18] break-all">{paymentLink}</p>
               </div>
 
-              {/* Amount input */}
-              <div className="flex items-center gap-2 mt-3">
+              {/* Optional amount */}
+              <div className="flex items-center gap-2">
                 <Input
                   type="number"
-                  placeholder="Amount"
+                  placeholder="Amount (optional)"
                   value={requestAmount}
                   onChange={(e) => setRequestAmount(e.target.value)}
-                  className="h-9 w-28 text-center border-[#E4E2DC] focus:border-[#1C1B18] focus:ring-[#1C1B18]"
+                  className="h-10 flex-1 border-[#E4E2DC] focus:border-[#1C1B18] focus:ring-[#1C1B18]"
                 />
-                <span className="text-sm text-[#6B6960]">USDC</span>
+                <span className="text-sm text-[#6B6960] w-12">USDC</span>
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-2 mt-3">
+              <div className="flex gap-2">
                 <Button
                   onClick={handleCopy}
                   variant="outline"
-                  size="sm"
-                  className="border-[#E4E2DC] hover:bg-[#F8F7F4]"
+                  className="flex-1 border-[#E4E2DC] hover:bg-[#F8F7F4]"
                 >
                   {copied ? (
                     <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="mr-1.5 text-[#22C55E]">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="mr-2 text-[#22C55E]">
                         <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
-                      Copied
+                      Copied!
                     </>
                   ) : (
                     <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="mr-1.5">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="mr-2">
                         <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="2"/>
                         <path d="M5 15H4C2.89543 15 2 14.1046 2 13V4C2 2.89543 2.89543 2 4 2H13C14.1046 2 15 2.89543 15 4V5" stroke="currentColor" strokeWidth="2"/>
                       </svg>
-                      Copy
+                      Copy Link
                     </>
                   )}
                 </Button>
@@ -1018,22 +948,15 @@ export function ReceiverDashboard() {
                   onClick={async () => {
                     if (navigator.share) {
                       try {
-                        await navigator.share({
-                          title: `Pay ${ensName}`,
-                          text: 'Pay me with any token on any chain',
-                          url: paymentLink,
-                        })
-                      } catch {
-                        // User cancelled or share failed
-                      }
+                        await navigator.share({ title: `Pay ${ensName}`, url: paymentLink })
+                      } catch {}
                     } else {
                       handleCopy()
                     }
                   }}
-                  size="sm"
-                  className="bg-[#1C1B18] hover:bg-[#2D2C28] text-white"
+                  className="flex-1 bg-[#1C1B18] hover:bg-[#2D2C28] text-white"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="mr-1.5">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="mr-2">
                     <path d="M4 12V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                     <path d="M16 6L12 2L8 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M12 2V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -1046,7 +969,87 @@ export function ReceiverDashboard() {
         </CardContent>
       </Card>
 
-      {/* Stats Row */}
+      {/* Simple Status Card - What happens to payments */}
+      <Card className="border-[#E4E2DC] bg-white">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#EDF5F0] flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#22C55E]">
+                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-[#1C1B18]">Payments auto-convert to USDC</p>
+                <p className="text-sm text-[#6B6960]">
+                  {currentVault ? (
+                    <>Earning yield via <span className="text-[#22C55E] font-medium">{currentStrategyDisplay}</span></>
+                  ) : (
+                    <>Will earn ~4% APY once configured</>
+                  )}
+                </p>
+              </div>
+            </div>
+            {vaultPosition && parseFloat(vaultPosition.assets) > 0 && (
+              <div className="text-right">
+                <p className="text-lg font-semibold text-[#1C1B18]">${vaultPosition.assets}</p>
+                <p className="text-xs text-[#22C55E]">+${vaultPosition.earned} earned</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Customize Button - Toggle Advanced Options */}
+      <button
+        onClick={() => setShowAdvanced(!showAdvanced)}
+        className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-[#6B6960] hover:text-[#1C1B18] transition-colors"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+        >
+          <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        {showAdvanced ? 'Hide options' : 'Customize how you receive payments'}
+      </button>
+
+      {/* Advanced Options - Collapsed by Default */}
+      {showAdvanced && (
+        <div className="space-y-5 animate-in slide-in-from-top-2 duration-200">
+          {/* ENS Profile Card - Simplified */}
+          <Card className="border-[#E4E2DC] bg-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {ensAvatar ? (
+                    <img src={ensAvatar} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#627EEA] to-[#C99FFF] flex items-center justify-center">
+                      <span className="text-sm font-bold text-white">{ensName?.charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-medium text-[#1C1B18]">{ensName}</p>
+                    <p className="text-xs text-[#6B6960] font-mono">{address?.slice(0, 6)}...{address?.slice(-4)}</p>
+                  </div>
+                </div>
+                <a
+                  href={`https://app.ens.domains/${ensName}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-[#627EEA] hover:underline"
+                >
+                  Edit on ENS →
+                </a>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Stats Row */}
       <div className="grid grid-cols-2 gap-4">
         <Card className="border-[#E4E2DC] bg-white">
           <CardContent className="p-5">
@@ -1917,6 +1920,9 @@ export function ReceiverDashboard() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+        </div>
       )}
 
       {/* Recent Payments */}

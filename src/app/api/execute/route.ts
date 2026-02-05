@@ -4,6 +4,7 @@ import { getTransactionData } from '@/lib/routing/execute-route'
 import { buildSetPreferenceTransaction } from '@/lib/ens/write'
 import { getTokenAddress, getTokenDecimals, CHAIN_MAP } from '@/lib/routing/tokens'
 import { getYieldRouteQuote } from '@/lib/routing/yield-router'
+import { getRestakingRouteQuote } from '@/lib/routing/restaking-router'
 import type { ParsedIntent } from '@/lib/types'
 
 const ERC20_TRANSFER_ABI = [
@@ -22,7 +23,7 @@ const ERC20_TRANSFER_ABI = [
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { routeId, fromAddress, intent, slippage, ensName, yieldVault, recipient } = body as {
+    const { routeId, fromAddress, intent, slippage, ensName, yieldVault, recipient, useRestakingRoute } = body as {
       routeId: string
       fromAddress: string
       intent: ParsedIntent
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
       ensName?: string
       yieldVault?: string
       recipient?: string
+      useRestakingRoute?: boolean
     }
 
     // ENS preference write — returns resolver multicall tx directly
@@ -130,6 +132,49 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Restaking route — LI.FI Contract Calls with Renzo deposit for ezETH
+    if (routeId?.startsWith('restaking-route') || useRestakingRoute) {
+      if (!recipient || !intent?.fromToken || !intent?.amount) {
+        return NextResponse.json(
+          { error: 'Missing recipient, fromToken, or amount for restaking route' },
+          { status: 400 },
+        )
+      }
+
+      const restakingResult = await getRestakingRouteQuote({
+        fromAddress,
+        fromChain: intent.fromChain || 'ethereum',
+        fromToken: intent.fromToken,
+        amount: intent.amount,
+        recipient,
+        slippage,
+      })
+
+      if ('error' in restakingResult) {
+        return NextResponse.json(
+          { error: restakingResult.error },
+          { status: 400 },
+        )
+      }
+
+      const txRequest = restakingResult.quote.transactionRequest
+      if (!txRequest) {
+        return NextResponse.json(
+          { error: 'No transaction request in restaking quote' },
+          { status: 500 },
+        )
+      }
+
+      return NextResponse.json({
+        to: txRequest.to,
+        data: txRequest.data,
+        value: txRequest.value?.toString() || '0',
+        chainId: txRequest.chainId,
+        provider: 'LI.FI + Renzo',
+        routeType: 'contract-call',
+      })
+    }
+
     // Detect v4 route and pass provider hint
     const provider = routeId?.startsWith('v4-') ? 'Uniswap v4' : undefined
 
@@ -140,10 +185,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Deposit/yield intents resolve the vault token internally, so toToken
+    // Deposit/yield/restaking intents resolve the vault token internally, so toToken
     // is not required for those actions.
     const isComposerAction =
-      intent.action === 'deposit' || intent.action === 'yield'
+      intent.action === 'deposit' || intent.action === 'yield' || intent.action === 'restaking'
 
     if (!intent.fromToken || !intent.amount) {
       return NextResponse.json(

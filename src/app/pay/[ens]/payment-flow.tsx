@@ -6,6 +6,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { OnrampModal } from '@/components/onramp-modal'
 import type { ENSResolution, RouteOption } from '@/lib/types'
 
 interface Props {
@@ -27,7 +28,20 @@ const SUPPORTED_CHAINS = [
   { id: 'linea', name: 'Linea', chainId: 59144 },
 ] as const
 
-type ExecutionState = 'idle' | 'quoting' | 'approving' | 'pending' | 'confirmed' | 'error'
+type ExecutionState = 'idle' | 'quoting' | 'checking-approval' | 'approving' | 'pending' | 'confirmed' | 'error'
+
+// Block explorer URLs by chain
+const BLOCK_EXPLORERS: Record<string, string> = {
+  ethereum: 'https://etherscan.io',
+  base: 'https://basescan.org',
+  arbitrum: 'https://arbiscan.io',
+  optimism: 'https://optimistic.etherscan.io',
+  polygon: 'https://polygonscan.com',
+  avalanche: 'https://snowtrace.io',
+  bsc: 'https://bscscan.com',
+  zksync: 'https://explorer.zksync.io',
+  linea: 'https://lineascan.build',
+}
 
 type TokenBalance = {
   chain: string
@@ -76,15 +90,32 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
   const [error, setError] = useState<string | null>(null)
   const [showAllChains, setShowAllChains] = useState(false)
 
+  // Payment memo
+  const [memo, setMemo] = useState('')
+  const [showMemo, setShowMemo] = useState(false)
+
   // Quote state
   const [quote, setQuote] = useState<RouteOption | null>(null)
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const [yieldVault, setYieldVault] = useState<string | null>(null)
   const [useYieldRoute, setUseYieldRoute] = useState(false)
+  const [useRestakingRoute, setUseRestakingRoute] = useState(false)
+  const [strategyName, setStrategyName] = useState<string | null>(null)
+  const [protocol, setProtocol] = useState<string | null>(null)
 
   // Execution state
   const [executionState, setExecutionState] = useState<ExecutionState>('idle')
   const [txHash, setTxHash] = useState<string | null>(null)
+  const [txChain, setTxChain] = useState<string>('base') // Track which chain tx was sent on
+
+  // Destination is always USDC on Base (core product promise)
+  // Recipient's "preference" is which vault to use, not the output token
+  const destChain = 'base'
+  const destToken = 'USDC'
+
+  // Fiat onramp state
+  const [showOnramp, setShowOnramp] = useState(false)
+  const [onrampCompleted, setOnrampCompleted] = useState(false)
 
   // Fetch recipient ENS info
   useEffect(() => {
@@ -113,6 +144,9 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
       setQuoteError(null)
       setYieldVault(null)
       setUseYieldRoute(false)
+      setUseRestakingRoute(false)
+      setStrategyName(null)
+      setProtocol(null)
       return
     }
 
@@ -130,9 +164,9 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
           body: JSON.stringify({
             amount,
             fromToken: selectedToken,
-            toToken: 'USDC',
+            toToken: destToken,
             fromChain: selectedChain,
-            toChain: 'base',
+            toChain: destChain,
             toAddress: ensName,
             userAddress: address,
             slippage: 0.005,
@@ -151,6 +185,9 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
           setQuote(data.routes[0])
           setYieldVault(data.yieldVault || null)
           setUseYieldRoute(data.useYieldRoute || false)
+          setUseRestakingRoute(data.useRestakingRoute || false)
+          setStrategyName(data.strategyName || null)
+          setProtocol(data.protocol || null)
         } else {
           setQuoteError('No routes available')
         }
@@ -178,8 +215,9 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
   const handleExecute = useCallback(async () => {
     if (!address || !recipientInfo?.address || !amount || !quote) return
 
-    setExecutionState('approving')
+    setExecutionState('checking-approval')
     setTxHash(null)
+    setQuoteError(null)
 
     try {
       // Check if we need to switch chains
@@ -187,6 +225,46 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
       if (targetChain && walletChainId !== targetChain.chainId) {
         await switchChainAsync({ chainId: targetChain.chainId })
       }
+
+      // Track which chain we're sending on for the block explorer link
+      setTxChain(selectedChain)
+
+      // Check token approval for ERC20 tokens (not needed for native ETH)
+      if (selectedToken !== 'ETH') {
+        setExecutionState('checking-approval')
+        const approvalRes = await fetch('/api/approval/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: selectedToken,
+            chain: selectedChain,
+            owner: address,
+            spender: quote.id === 'direct-transfer' ? recipientInfo.address : undefined,
+            amount,
+          }),
+        })
+
+        if (approvalRes.ok) {
+          const approvalData = await approvalRes.json()
+          if (approvalData.needsApproval) {
+            setExecutionState('approving')
+            // Send approval transaction
+            const approvalHash = await sendTransactionAsync({
+              to: approvalData.tokenAddress as `0x${string}`,
+              data: approvalData.approvalData as `0x${string}`,
+              value: BigInt(0),
+            })
+            // Wait a moment for approval to be indexed
+            await new Promise(resolve => setTimeout(resolve, 2000))
+          }
+        }
+        // If approval check fails, continue anyway - the execute API will handle it
+      }
+
+      setExecutionState('approving')
+
+      // Determine action type based on route
+      const actionType = useRestakingRoute ? 'restaking' : useYieldRoute ? 'yield' : 'transfer'
 
       // Get transaction data from execute API
       const res = await fetch('/api/execute', {
@@ -196,19 +274,25 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
           routeId: quote.id,
           fromAddress: address,
           intent: {
-            action: useYieldRoute ? 'yield' : 'transfer',
+            action: actionType,
             amount,
             fromToken: selectedToken,
-            toToken: 'USDC',
+            toToken: useRestakingRoute ? 'ezETH' : destToken,
             toAddress: recipientInfo.address,
             fromChain: selectedChain,
-            toChain: 'base',
+            toChain: destChain,
+            memo: memo || undefined,
           },
-          slippage: 0.005,
+          slippage: useRestakingRoute ? 0.01 : 0.005, // Higher slippage for restaking
           ensName,
           // Yield route params
           ...(useYieldRoute && yieldVault && {
             yieldVault,
+            recipient: recipientInfo.address,
+          }),
+          // Restaking route params
+          ...(useRestakingRoute && {
+            useRestakingRoute: true,
             recipient: recipientInfo.address,
           }),
         }),
@@ -252,7 +336,9 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
     sendTransactionAsync,
     ensName,
     useYieldRoute,
+    useRestakingRoute,
     yieldVault,
+    memo,
   ])
 
   if (loading) {
@@ -334,7 +420,6 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
         </div>
       )}
 
-
       {/* Success state */}
       {executionState === 'confirmed' && txHash && (
         <div className="rounded-xl bg-[#EDF5F0] border border-[#B7D4C7] p-4">
@@ -349,7 +434,7 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
                 Payment sent!
               </p>
               <a
-                href={`https://basescan.org/tx/${txHash}`}
+                href={`${BLOCK_EXPLORERS[txChain] || BLOCK_EXPLORERS.base}/tx/${txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-[#2D6A4F]/70 font-mono break-all hover:underline"
@@ -514,10 +599,49 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
             </div>
           </div>
 
+          {/* Payment memo */}
+          <div>
+            {!showMemo ? (
+              <button
+                onClick={() => setShowMemo(true)}
+                disabled={isExecuting}
+                className="text-sm text-[#6B6960] hover:text-[#1C1B18] flex items-center gap-1 disabled:opacity-50"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                Add a note
+              </button>
+            ) : (
+              <div>
+                <label className="text-sm font-medium text-[#1C1B18] mb-1.5 block">
+                  Note (optional)
+                </label>
+                <Input
+                  placeholder="e.g. March invoice, coffee payment..."
+                  value={memo}
+                  onChange={(e) => setMemo(e.target.value)}
+                  maxLength={100}
+                  disabled={isExecuting}
+                  className="border-[#E4E2DC] disabled:opacity-50"
+                />
+                <p className="text-xs text-[#9C9B93] mt-1">{memo.length}/100</p>
+              </div>
+            )}
+          </div>
+
           {/* Quote display */}
           {quote && (
             <div className="rounded-lg bg-[#F8F7F4] p-3 space-y-1">
-              {useYieldRoute && (
+              {useRestakingRoute && (
+                <div className="flex items-center gap-2 text-sm text-[#7C3AED] pb-2 mb-2 border-b border-[#E4E2DC]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span>Restaking: receives WETH ready for Renzo deposit</span>
+                </div>
+              )}
+              {useYieldRoute && !useRestakingRoute && (
                 <div className="flex items-center gap-2 text-sm text-[#2D6A4F] pb-2 mb-2 border-b border-[#E4E2DC]">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -569,7 +693,7 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
 
           {/* Connect / Pay button */}
           {!isConnected ? (
-            <div className="pt-2">
+            <div className="pt-2 space-y-3">
               <ConnectButton.Custom>
                 {({ openConnectModal }) => (
                   <Button
@@ -580,36 +704,85 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
                   </Button>
                 )}
               </ConnectButton.Custom>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-[#E4E2DC]" />
+                <span className="text-xs text-[#9C9B93]">or</span>
+                <div className="flex-1 h-px bg-[#E4E2DC]" />
+              </div>
+
+              {/* Pay with Card - no wallet needed */}
+              <Button
+                variant="outline"
+                onClick={() => setShowOnramp(true)}
+                className="w-full h-12 border-[#E4E2DC] hover:bg-[#F8F7F4] font-medium"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="mr-2">
+                  <rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M3 10H21" stroke="currentColor" strokeWidth="2"/>
+                </svg>
+                Pay with Card
+              </Button>
             </div>
           ) : (
-            <Button
-              className="w-full h-12 bg-[#1C1B18] hover:bg-[#2D2C28] text-white font-medium disabled:opacity-50"
-              disabled={!canExecute}
-              onClick={handleExecute}
-            >
-              {executionState === 'quoting' ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                  Getting quote...
-                </span>
-              ) : executionState === 'approving' ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                  Approve in wallet...
-                </span>
-              ) : executionState === 'pending' ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                  Confirming...
-                </span>
-              ) : executionState === 'confirmed' ? (
-                'Payment sent!'
-              ) : amount && parseFloat(amount) > 0 ? (
-                `Pay ${parseFloat(amount).toFixed(2)} ${selectedToken}`
-              ) : (
-                'Enter amount'
+            <div className="space-y-3">
+              <Button
+                className="w-full h-12 bg-[#1C1B18] hover:bg-[#2D2C28] text-white font-medium disabled:opacity-50"
+                disabled={!canExecute}
+                onClick={handleExecute}
+              >
+                {executionState === 'quoting' ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    Getting quote...
+                  </span>
+                ) : executionState === 'checking-approval' ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    Checking approval...
+                  </span>
+                ) : executionState === 'approving' ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    Approve in wallet...
+                  </span>
+                ) : executionState === 'pending' ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    Confirming...
+                  </span>
+                ) : executionState === 'confirmed' ? (
+                  'Payment sent!'
+                ) : amount && parseFloat(amount) > 0 ? (
+                  `Pay ${parseFloat(amount).toFixed(2)} ${selectedToken}`
+                ) : (
+                  'Enter amount'
+                )}
+              </Button>
+
+              {/* Pay with Card option for connected users too */}
+              {balances.length === 0 && !balancesLoading && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-[#E4E2DC]" />
+                    <span className="text-xs text-[#9C9B93]">no balance?</span>
+                    <div className="flex-1 h-px bg-[#E4E2DC]" />
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowOnramp(true)}
+                    className="w-full h-10 border-[#E4E2DC] hover:bg-[#F8F7F4] text-sm"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="mr-2">
+                      <rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="2"/>
+                      <path d="M3 10H21" stroke="currentColor" strokeWidth="2"/>
+                    </svg>
+                    Buy USDC with Card
+                  </Button>
+                </>
               )}
-            </Button>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -618,6 +791,28 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
       <p className="text-xs text-center text-[#6B6960]">
         Powered by LI.FI cross-chain routing
       </p>
+
+      {/* Onramp Modal */}
+      <OnrampModal
+        isOpen={showOnramp}
+        onClose={() => {
+          setShowOnramp(false)
+          // Refresh balances after onramp
+          if (onrampCompleted && address) {
+            setOnrampCompleted(false)
+            // Force balance refresh by triggering a re-render
+            window.location.reload()
+          }
+        }}
+        walletAddress={address || ''}
+        fiatAmount={amount ? parseFloat(amount) : undefined}
+        onOrderCompleted={() => {
+          setOnrampCompleted(true)
+          // Auto-select USDC on Base after purchase
+          setSelectedToken('USDC')
+          setSelectedChain('base')
+        }}
+      />
     </div>
   )
 }

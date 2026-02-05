@@ -7,11 +7,7 @@ export default function LandingPage() {
       <nav className="border-b border-[#E4E2DC] bg-[#F8F7F4]/80 backdrop-blur-xl">
         <div className="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-[#1C1B18] flex items-center justify-center">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="text-[#F8F7F4]">
-                <path d="M8 1L14.5 5V11L8 15L1.5 11V5L8 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-              </svg>
-            </div>
+            <img src="/logo.png" alt="FlowFi" className="w-7 h-7 rounded-lg" />
             <span className="text-sm font-semibold text-[#1C1B18]">FlowFi</span>
           </div>
           <Link

@@ -78,8 +78,34 @@ export async function GET(req: NextRequest) {
         transport: http(chainConfig.rpc),
       })
 
+      const chainBalances: TokenBalance[] = []
+
+      // Fetch native ETH balance
+      try {
+        const ethBalance = await client.getBalance({ address: address as Address })
+        if (ethBalance > BigInt(0)) {
+          const formatted = formatUnits(ethBalance, 18)
+          // Approximate ETH price ~$2500 (could fetch from price API)
+          const ethPrice = 2500
+          const usdValue = parseFloat(formatted) * ethPrice
+
+          if (usdValue >= 0.01) {
+            chainBalances.push({
+              chain: chainConfig.name,
+              chainId: chainConfig.id,
+              token: 'ETH',
+              balance: formatted,
+              balanceUSD: usdValue,
+            })
+          }
+        }
+      } catch {
+        // Ignore ETH fetch errors
+      }
+
+      // Fetch ERC20 token balances
       const chainTokens = TOKENS[chainConfig.name]
-      if (!chainTokens) return []
+      if (!chainTokens) return chainBalances
 
       const tokenEntries = Object.entries(chainTokens)
       const results = await Promise.allSettled(
@@ -93,7 +119,6 @@ export async function GET(req: NextRequest) {
         )
       )
 
-      const chainBalances: TokenBalance[] = []
       results.forEach((result, i) => {
         if (result.status === 'fulfilled' && result.value > BigInt(0)) {
           const [symbol, info] = tokenEntries[i]

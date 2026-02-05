@@ -39,12 +39,7 @@ export default function AppPage() {
       {/* Header */}
       <header className="flex items-center justify-between px-5 sm:px-8 py-3 border-b border-[#E4E2DC] bg-white shrink-0">
         <Link href="/" className="flex items-center gap-2.5 shrink-0 hover:opacity-80 transition-opacity">
-          <div className="w-7 h-7 rounded-md bg-[#1C1B18] flex items-center justify-center">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-[#F8F7F4]">
-              <path d="M8 1L14.5 5V11L8 15L1.5 11V5L8 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-              <path d="M8 5.5V10.5M5.5 8H10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </div>
+          <img src="/logo.png" alt="FlowFi" className="w-7 h-7 rounded-lg" />
           <span className="text-[15px] font-semibold tracking-tight text-[#1C1B18]">
             FlowFi
           </span>
