@@ -100,27 +100,46 @@ export async function POST(req: NextRequest) {
     // Effective slippage
     const effectiveSlippage = slippage ?? ensSlippage
 
-    // Find routes
-    const lifiRoutes = await findRoutes({
-      fromAddress: userAddress,
-      fromChain,
-      toChain,
-      fromToken,
-      toToken: finalToToken,
-      amount,
-      slippage: effectiveSlippage,
-    })
+    // Same token, same chain = simple transfer (no bridge/swap needed)
+    const isSameTokenSameChain =
+      fromToken.toUpperCase() === finalToToken.toUpperCase() &&
+      fromChain.toLowerCase() === toChain.toLowerCase()
 
-    // Check for v4 hook routes (same-chain stablecoin swaps)
-    const v4Routes = findV4Routes({
-      fromChain,
-      toChain,
-      fromToken,
-      toToken: finalToToken,
-      amount,
-    })
+    let allRoutes: Awaited<ReturnType<typeof findRoutes>> = []
 
-    let allRoutes = [...v4Routes, ...lifiRoutes]
+    if (isSameTokenSameChain) {
+      // Direct transfer - no routing needed
+      allRoutes = [{
+        id: 'direct-transfer',
+        path: `${fromToken} → ${finalToToken}`,
+        fee: '$0.00',
+        estimatedTime: '< 1 min',
+        provider: 'Direct Transfer',
+        routeType: 'standard',
+      }]
+    } else {
+      // Find routes via LI.FI
+      const lifiRoutes = await findRoutes({
+        fromAddress: userAddress,
+        fromChain,
+        toChain,
+        fromToken,
+        toToken: finalToToken,
+        amount,
+        slippage: effectiveSlippage,
+      })
+
+      // Check for v4 hook routes (same-chain stablecoin swaps)
+      const v4Routes = findV4Routes({
+        fromChain,
+        toChain,
+        fromToken,
+        toToken: finalToToken,
+        amount,
+      })
+
+      allRoutes = [...v4Routes, ...lifiRoutes]
+    }
 
     // Filter by maxFee if set
     if (ensMaxFee) {
