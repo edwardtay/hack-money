@@ -42,21 +42,21 @@ export default function LandingPage() {
             </svg>
           </Link>
 
-          {/* Stats */}
-          <div className="flex items-center justify-center gap-8 mt-12 text-sm">
-            <div>
-              <p className="text-2xl font-semibold text-[#22C55E]">5%</p>
-              <p className="text-[#9C9B93]">APY</p>
+          {/* Features */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mt-12 text-sm">
+            <div className="text-center">
+              <p className="font-semibold text-[#1C1B18]">Any token, any chain</p>
+              <p className="text-[#9C9B93]">LI.FI</p>
             </div>
-            <div className="w-px h-8 bg-[#E4E2DC]" />
-            <div>
-              <p className="text-2xl font-semibold text-[#1C1B18]">Any</p>
-              <p className="text-[#9C9B93]">Token</p>
+            <div className="hidden sm:block w-px h-8 bg-[#E4E2DC]" />
+            <div className="text-center">
+              <p className="font-semibold text-[#22C55E]">Up to 5% APY</p>
+              <p className="text-[#9C9B93]">Aave · Morpho</p>
             </div>
-            <div className="w-px h-8 bg-[#E4E2DC]" />
-            <div>
-              <p className="text-2xl font-semibold text-[#1C1B18]">Any</p>
-              <p className="text-[#9C9B93]">Chain</p>
+            <div className="hidden sm:block w-px h-8 bg-[#E4E2DC]" />
+            <div className="text-center">
+              <p className="font-semibold text-[#1C1B18]">ENS as config</p>
+              <p className="text-[#9C9B93]">Uniswap V4</p>
             </div>
           </div>
         </div>
