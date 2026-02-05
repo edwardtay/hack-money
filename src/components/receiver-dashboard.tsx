@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAccount, useSendTransaction, useSwitchChain } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { QRCodeSVG } from 'qrcode.react'
@@ -8,8 +8,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 
-// Vault options with their underlying token
+// Risk tiers for vault categorization
+type RiskTier = 'low' | 'medium' | 'high'
+
+// Vault options with their underlying token and risk tier
 const VAULT_OPTIONS = [
+  // Low Risk - Blue Chip Lenders
   {
     id: 'aave-usdc',
     address: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB',
@@ -17,15 +21,82 @@ const VAULT_OPTIONS = [
     token: 'USDC',
     protocol: 'Aave v3',
     chain: 'Base',
+    risk: 'low' as RiskTier,
+    description: 'Battle-tested lending protocol',
   },
   {
-    id: 'morpho-usdc',
-    address: '0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A',
-    name: 'Morpho USDC',
+    id: 'moonwell-usdc',
+    address: '0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca',
+    name: 'Moonwell USDC',
     token: 'USDC',
-    protocol: 'Morpho',
+    protocol: 'Moonwell',
     chain: 'Base',
+    risk: 'low' as RiskTier,
+    description: 'Leading Base-native lender',
   },
+  // Medium Risk - Morpho Curated Vaults
+  {
+    id: 'gauntlet-prime',
+    address: '0xeE8F4eC5672F09119b96Ab6fB59C27E1b7e44b61',
+    name: 'Gauntlet Prime',
+    token: 'USDC',
+    protocol: 'Morpho · Gauntlet',
+    chain: 'Base',
+    risk: 'medium' as RiskTier,
+    description: 'Curated by Gauntlet risk team',
+  },
+  {
+    id: 'seamless-usdc',
+    address: '0x616a4E1db48e22028f6bbf20444Cd3b8e3273738',
+    name: 'Seamless USDC',
+    token: 'USDC',
+    protocol: 'Morpho · Seamless',
+    chain: 'Base',
+    risk: 'medium' as RiskTier,
+    description: 'Seamless Protocol vault',
+  },
+  {
+    id: 'spark-usdc',
+    address: '0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A',
+    name: 'Spark USDC',
+    token: 'USDC',
+    protocol: 'Morpho · Spark',
+    chain: 'Base',
+    risk: 'medium' as RiskTier,
+    description: 'MakerDAO ecosystem vault',
+  },
+  // Higher Risk - Aggressive Strategies
+  {
+    id: 'gauntlet-frontier',
+    address: '0x236919F11ff9eA9550A4287696C2FC9e18E6e890',
+    name: 'Gauntlet Frontier',
+    token: 'USDC',
+    protocol: 'Morpho · Gauntlet',
+    chain: 'Base',
+    risk: 'high' as RiskTier,
+    description: 'Higher yield, newer markets',
+  },
+  {
+    id: 'steakhouse-rwa',
+    address: '0xbEefc4aDBE58173FCa2C042097Fe33095E68C3D6',
+    name: 'Steakhouse RWA',
+    token: 'USDC',
+    protocol: 'Morpho · Steakhouse',
+    chain: 'Base',
+    risk: 'high' as RiskTier,
+    description: 'Real-world asset exposure',
+  },
+  {
+    id: 're7-rwa',
+    address: '0x6e37C95b43566E538D8C278eb69B00FC717a001b',
+    name: 'Re7 RWA',
+    token: 'USDC',
+    protocol: 'Morpho · Re7',
+    chain: 'Base',
+    risk: 'high' as RiskTier,
+    description: 'RWA-backed yields',
+  },
+  // No Yield Option
   {
     id: 'none',
     address: '',
@@ -33,8 +104,32 @@ const VAULT_OPTIONS = [
     token: 'USDC',
     protocol: 'Direct to wallet',
     chain: 'Base',
+    risk: 'low' as RiskTier,
+    description: 'Keep USDC liquid',
   },
 ] as const
+
+type VaultAllocation = {
+  vault: string
+  percentage: number
+}
+
+type SmartVaultConfig = {
+  allocations: VaultAllocation[]
+  conditionalRoutingEnabled: boolean
+  conditionalVaults: string[]
+}
+
+type SmartVaultReceipt = {
+  id: string
+  sender: string
+  token: string
+  tokenSymbol: string
+  amount: string
+  timestamp: string
+  deposits: { vault: string; amount: string; shares: string }[]
+  nftId: string
+}
 
 type VaultPosition = {
   shares: string
@@ -75,6 +170,8 @@ function useEnsName(address?: string) {
 
 function useEnsPreferences(ensName: string | null) {
   const [vault, setVault] = useState<string | null>(null)
+  const [strategy, setStrategy] = useState<string | null>(null)
+  const [strategies, setStrategies] = useState<string | null>(null)
   const [avatar, setAvatar] = useState<string | null>(null)
   const [description, setDescription] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -82,6 +179,8 @@ function useEnsPreferences(ensName: string | null) {
   useEffect(() => {
     if (!ensName) {
       setVault(null)
+      setStrategy(null)
+      setStrategies(null)
       setAvatar(null)
       setDescription(null)
       return
@@ -92,6 +191,8 @@ function useEnsPreferences(ensName: string | null) {
       .then((r) => r.json())
       .then((data) => {
         setVault(data.yieldVault ?? null)
+        setStrategy(data.strategy ?? null)
+        setStrategies(data.strategies ?? null)
         setDescription(data.description ?? null)
         // Convert IPFS URL to HTTP gateway
         if (data.avatar) {
@@ -103,13 +204,15 @@ function useEnsPreferences(ensName: string | null) {
       })
       .catch(() => {
         setVault(null)
+        setStrategy(null)
+        setStrategies(null)
         setAvatar(null)
         setDescription(null)
       })
       .finally(() => setLoading(false))
   }, [ensName])
 
-  return { vault, avatar, description, loading }
+  return { vault, strategy, strategies, avatar, description, loading }
 }
 
 function useReceipts(address?: string) {
@@ -183,6 +286,58 @@ function useVaultApys() {
   return apys
 }
 
+function useSmartVaultConfig(address?: string) {
+  const [config, setConfig] = useState<SmartVaultConfig | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const refetch = useCallback(() => {
+    if (!address) {
+      setConfig(null)
+      return
+    }
+
+    setLoading(true)
+    fetch(`/api/smart-vault/config?recipient=${address}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.error) {
+          setConfig(data)
+        } else {
+          setConfig(null)
+        }
+      })
+      .catch(() => setConfig(null))
+      .finally(() => setLoading(false))
+  }, [address])
+
+  useEffect(() => {
+    refetch()
+  }, [refetch])
+
+  return { config, loading, refetch }
+}
+
+function useSmartVaultReceipts(address?: string) {
+  const [receipts, setReceipts] = useState<SmartVaultReceipt[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!address) {
+      setReceipts([])
+      return
+    }
+
+    setLoading(true)
+    fetch(`/api/smart-vault/receipts?recipient=${address}`)
+      .then((r) => r.json())
+      .then((data) => setReceipts(data.receipts ?? []))
+      .catch(() => setReceipts([]))
+      .finally(() => setLoading(false))
+  }, [address])
+
+  return { receipts, loading }
+}
+
 function formatAddress(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`
 }
@@ -197,19 +352,52 @@ export function ReceiverDashboard() {
   const { sendTransactionAsync } = useSendTransaction()
   const { switchChainAsync } = useSwitchChain()
   const { name: ensName, loading: ensLoading } = useEnsName(address)
-  const { vault: currentVault, avatar: ensAvatar, description: ensDescription, loading: prefsLoading } = useEnsPreferences(ensName)
+  const { vault: currentVault, strategy: currentStrategy, strategies: currentStrategies, avatar: ensAvatar, description: ensDescription, loading: prefsLoading } = useEnsPreferences(ensName)
   const { receipts, loading: receiptsLoading } = useReceipts(address)
   const vaultApys = useVaultApys()
   const { position: vaultPosition, loading: positionLoading } = useVaultPosition(currentVault ?? undefined, address)
+  const { config: smartVaultConfig, loading: configLoading, refetch: refetchConfig } = useSmartVaultConfig(address)
+  const { receipts: smartVaultReceipts, loading: smartReceiptsLoading } = useSmartVaultReceipts(address)
 
   const [selectedVaultId, setSelectedVaultId] = useState<string>('')
   const [customVault, setCustomVault] = useState('')
+  const [selectedStrategy, setSelectedStrategy] = useState<string>('yield')
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveTxHash, setSaveTxHash] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [requestAmount, setRequestAmount] = useState('')
+
+  // Multi-vault allocation state
+  const [useMultiVault, setUseMultiVault] = useState(false)
+  const [multiVaultAllocations, setMultiVaultAllocations] = useState<{ vault: typeof VAULT_OPTIONS[number]; percentage: number }[]>([
+    { vault: VAULT_OPTIONS[0], percentage: 50 },
+    { vault: VAULT_OPTIONS[1], percentage: 50 },
+  ])
+  const [useConditionalRouting, setUseConditionalRouting] = useState(false)
+  const [savingMultiVault, setSavingMultiVault] = useState(false)
+  const [multiVaultSuccess, setMultiVaultSuccess] = useState(false)
+  const [multiVaultError, setMultiVaultError] = useState<string | null>(null)
+  const [multiVaultTxHash, setMultiVaultTxHash] = useState<string | null>(null)
+
+  // Sync multi-vault state with on-chain config
+  useEffect(() => {
+    if (smartVaultConfig && smartVaultConfig.allocations.length > 0) {
+      setUseMultiVault(true)
+      const allocs = smartVaultConfig.allocations.map((a) => {
+        const vaultOption = VAULT_OPTIONS.find(v => v.address.toLowerCase() === a.vault.toLowerCase())
+        return {
+          vault: vaultOption ?? VAULT_OPTIONS[0],
+          percentage: a.percentage,
+        }
+      })
+      setMultiVaultAllocations(allocs)
+    }
+    if (smartVaultConfig?.conditionalRoutingEnabled) {
+      setUseConditionalRouting(true)
+    }
+  }, [smartVaultConfig])
 
   // Sync selected vault with loaded preference
   useEffect(() => {
@@ -224,6 +412,35 @@ export function ReceiverDashboard() {
     }
   }, [currentVault, selectedVaultId])
 
+  // Sync selected strategy with loaded preference
+  useEffect(() => {
+    if (currentStrategy) {
+      setSelectedStrategy(currentStrategy)
+    }
+  }, [currentStrategy])
+
+  // Sync multi-strategy allocation with ENS record
+  useEffect(() => {
+    if (currentStrategies) {
+      setUseMultiStrategy(true)
+      const parts = currentStrategies.split(',')
+      const allocs: { strategy: 'yield' | 'restaking' | 'liquid'; percentage: number }[] = []
+      for (const part of parts) {
+        const [strategyType, percentStr] = part.split(':').map(s => s.trim())
+        const percentage = parseInt(percentStr, 10)
+        if (['yield', 'restaking', 'liquid'].includes(strategyType.toLowerCase()) && !isNaN(percentage)) {
+          allocs.push({
+            strategy: strategyType.toLowerCase() as 'yield' | 'restaking' | 'liquid',
+            percentage,
+          })
+        }
+      }
+      if (allocs.length > 0) {
+        setStrategyAllocations(allocs)
+      }
+    }
+  }, [currentStrategies])
+
   const selectedVault = VAULT_OPTIONS.find(v => v.id === selectedVaultId)
   const vaultAddress = selectedVaultId === 'custom' ? customVault : selectedVault?.address || ''
 
@@ -231,6 +448,170 @@ export function ReceiverDashboard() {
   const vaultChanged = currentVault
     ? vaultAddress.toLowerCase() !== currentVault.toLowerCase()
     : vaultAddress !== ''
+
+  // Check if strategy changed from current
+  const strategyChanged = currentStrategy
+    ? selectedStrategy.toLowerCase() !== currentStrategy.toLowerCase()
+    : selectedStrategy !== 'yield' // Default is yield, so only changed if not yield
+
+  // Strategy saving state
+  const [savingStrategy, setSavingStrategy] = useState(false)
+  const [strategySuccess, setStrategySuccess] = useState(false)
+
+  // Multi-strategy allocation state (ENS-based)
+  const [useMultiStrategy, setUseMultiStrategy] = useState(false)
+  const [strategyAllocations, setStrategyAllocations] = useState<{ strategy: 'yield' | 'restaking' | 'liquid'; percentage: number }[]>([
+    { strategy: 'yield', percentage: 50 },
+    { strategy: 'restaking', percentage: 50 },
+  ])
+  const [strategyTxHash, setStrategyTxHash] = useState<string | null>(null)
+  const [strategyError, setStrategyError] = useState<string | null>(null)
+
+  const handleSaveStrategy = async () => {
+    if (!ensName) return
+
+    setSavingStrategy(true)
+    setStrategySuccess(false)
+    setStrategyTxHash(null)
+    setStrategyError(null)
+
+    try {
+      // Switch to mainnet if needed (ENS is on mainnet)
+      if (chainId !== 1) {
+        await switchChainAsync({ chainId: 1 })
+      }
+
+      // If yield strategy and vault is set, save both together
+      const body: { ensName: string; strategy: string; vaultAddress?: string } = {
+        ensName,
+        strategy: selectedStrategy,
+      }
+
+      // Include vault address if yield strategy and vault is configured
+      if (selectedStrategy === 'yield' && vaultAddress && selectedVaultId !== 'none') {
+        body.vaultAddress = vaultAddress
+      }
+
+      const res = await fetch('/api/ens/set-strategy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to prepare transaction')
+      }
+
+      const txData = await res.json()
+
+      const hash = await sendTransactionAsync({
+        to: txData.to as `0x${string}`,
+        data: txData.data as `0x${string}`,
+        value: BigInt(txData.value || 0),
+      })
+
+      setStrategyTxHash(hash)
+      setStrategySuccess(true)
+    } catch (err: unknown) {
+      const errMessage = err instanceof Error ? err.message : 'Transaction failed'
+      if (/rejected|denied|user refused/i.test(errMessage)) {
+        setStrategyError('Transaction rejected')
+      } else {
+        setStrategyError(errMessage)
+      }
+    } finally {
+      setSavingStrategy(false)
+    }
+  }
+
+  // Calculate multi-strategy total
+  const strategyAllocationTotal = strategyAllocations.reduce((sum, a) => sum + a.percentage, 0)
+
+  // Format strategies string for ENS
+  const formatStrategiesForENS = () => {
+    return strategyAllocations
+      .filter(a => a.percentage > 0)
+      .map(a => `${a.strategy}:${a.percentage}`)
+      .join(',')
+  }
+
+  // Check if multi-strategy changed from current ENS record
+  const multiStrategyChanged = useMultiStrategy && (
+    !currentStrategies || formatStrategiesForENS() !== currentStrategies
+  )
+
+  const handleSaveMultiStrategy = async () => {
+    if (!ensName || strategyAllocationTotal !== 100) return
+
+    setSavingStrategy(true)
+    setStrategySuccess(false)
+    setStrategyTxHash(null)
+    setStrategyError(null)
+
+    try {
+      // Switch to mainnet if needed (ENS is on mainnet)
+      if (chainId !== 1) {
+        await switchChainAsync({ chainId: 1 })
+      }
+
+      const strategiesStr = formatStrategiesForENS()
+
+      const res = await fetch('/api/ens/set-strategies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ensName,
+          strategies: strategiesStr,
+        }),
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to prepare transaction')
+      }
+
+      const txData = await res.json()
+
+      const hash = await sendTransactionAsync({
+        to: txData.to as `0x${string}`,
+        data: txData.data as `0x${string}`,
+        value: BigInt(txData.value || 0),
+      })
+
+      setStrategyTxHash(hash)
+      setStrategySuccess(true)
+    } catch (err: unknown) {
+      const errMessage = err instanceof Error ? err.message : 'Transaction failed'
+      if (/rejected|denied|user refused/i.test(errMessage)) {
+        setStrategyError('Transaction rejected')
+      } else {
+        setStrategyError(errMessage)
+      }
+    } finally {
+      setSavingStrategy(false)
+    }
+  }
+
+  const updateStrategyAllocation = (index: number, percentage: number) => {
+    setStrategyAllocations(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], percentage }
+      return updated
+    })
+  }
+
+  const addStrategyAllocation = () => {
+    const usedStrategies = strategyAllocations.map(a => a.strategy)
+    const availableStrategies = (['yield', 'restaking', 'liquid'] as const).filter(s => !usedStrategies.includes(s))
+    if (availableStrategies.length > 0) {
+      setStrategyAllocations(prev => [...prev, { strategy: availableStrategies[0], percentage: 0 }])
+    }
+  }
+
+  const removeStrategyAllocation = (index: number) => {
+    setStrategyAllocations(prev => prev.filter((_, i) => i !== index))
+  }
 
   const handleSaveVault = async () => {
     if (!vaultAddress || !ensName || selectedVaultId === 'none') return
@@ -286,6 +667,130 @@ export function ReceiverDashboard() {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  const handleSaveMultiVault = async () => {
+    if (multiVaultAllocations.length === 0) return
+
+    setSavingMultiVault(true)
+    setMultiVaultSuccess(false)
+    setMultiVaultError(null)
+    setMultiVaultTxHash(null)
+
+    try {
+      // Switch to Base if needed
+      if (chainId !== 8453) {
+        await switchChainAsync({ chainId: 8453 })
+      }
+
+      // Build the allocation data
+      const vaults = multiVaultAllocations.map(a => a.vault.address)
+      const allocations = multiVaultAllocations.map(a => a.percentage)
+
+      const res = await fetch('/api/smart-vault/set-allocation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setAllocation', vaults, allocations }),
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to prepare transaction')
+      }
+
+      const txData = await res.json()
+
+      const hash = await sendTransactionAsync({
+        to: txData.to as `0x${string}`,
+        data: txData.data as `0x${string}`,
+        value: BigInt(txData.value || 0),
+        chainId: 8453,
+      })
+
+      setMultiVaultTxHash(hash)
+      setMultiVaultSuccess(true)
+      refetchConfig()
+    } catch (err: unknown) {
+      const errMessage = err instanceof Error ? err.message : 'Transaction failed'
+      if (/rejected|denied|user refused/i.test(errMessage)) {
+        setMultiVaultError('Transaction rejected')
+      } else {
+        setMultiVaultError(errMessage)
+      }
+    } finally {
+      setSavingMultiVault(false)
+    }
+  }
+
+  const handleToggleConditionalRouting = async () => {
+    setSavingMultiVault(true)
+    setMultiVaultError(null)
+
+    try {
+      // Switch to Base if needed
+      if (chainId !== 8453) {
+        await switchChainAsync({ chainId: 8453 })
+      }
+
+      const action = useConditionalRouting ? 'disableConditional' : 'enableConditional'
+      const vaults = useConditionalRouting ? undefined : VAULT_OPTIONS.filter(v => v.id !== 'none').map(v => v.address)
+
+      const res = await fetch('/api/smart-vault/set-allocation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, vaults }),
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to prepare transaction')
+      }
+
+      const txData = await res.json()
+
+      const hash = await sendTransactionAsync({
+        to: txData.to as `0x${string}`,
+        data: txData.data as `0x${string}`,
+        value: BigInt(txData.value || 0),
+        chainId: 8453,
+      })
+
+      setMultiVaultTxHash(hash)
+      setUseConditionalRouting(!useConditionalRouting)
+      refetchConfig()
+    } catch (err: unknown) {
+      const errMessage = err instanceof Error ? err.message : 'Transaction failed'
+      if (/rejected|denied|user refused/i.test(errMessage)) {
+        setMultiVaultError('Transaction rejected')
+      } else {
+        setMultiVaultError(errMessage)
+      }
+    } finally {
+      setSavingMultiVault(false)
+    }
+  }
+
+  const updateAllocation = (index: number, percentage: number) => {
+    setMultiVaultAllocations(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], percentage }
+      return updated
+    })
+  }
+
+  const addVaultAllocation = () => {
+    const unusedVault = VAULT_OPTIONS.find(v =>
+      v.id !== 'none' && !multiVaultAllocations.some(a => a.vault.id === v.id)
+    )
+    if (unusedVault) {
+      setMultiVaultAllocations(prev => [...prev, { vault: unusedVault, percentage: 0 }])
+    }
+  }
+
+  const removeVaultAllocation = (index: number) => {
+    setMultiVaultAllocations(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const totalAllocation = multiVaultAllocations.reduce((sum, a) => sum + a.percentage, 0)
 
   // Calculate totals from receipts
   const totalReceived = receipts.reduce((sum, r) => sum + parseFloat(r.amount || '0'), 0)
@@ -569,16 +1074,335 @@ export function ReceiverDashboard() {
         </Card>
       </div>
 
-      {/* Yield Vault Selection */}
+      {/* DeFi Strategy Selection */}
       <Card className="border-[#E4E2DC] bg-white">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg font-semibold text-[#1C1B18]">
-                Yield Strategy
+                DeFi Strategy
               </CardTitle>
               <p className="text-sm text-[#6B6960]">
-                Saved to your ENS text record
+                Choose how incoming payments are handled
+              </p>
+            </div>
+            {(currentStrategy || currentStrategies) && (
+              <span className="text-xs text-[#22C55E] font-medium">On-chain</span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Mode Toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setUseMultiStrategy(false)}
+              className={`flex-1 p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                !useMultiStrategy
+                  ? 'border-[#1C1B18] bg-[#FAFAF8]'
+                  : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+              }`}
+            >
+              Single Strategy
+            </button>
+            <button
+              onClick={() => setUseMultiStrategy(true)}
+              className={`flex-1 p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                useMultiStrategy
+                  ? 'border-[#1C1B18] bg-[#FAFAF8]'
+                  : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+              }`}
+            >
+              Multi-Strategy Split
+            </button>
+          </div>
+
+          {/* Single Strategy Mode */}
+          {!useMultiStrategy && (
+            <>
+              <button
+                onClick={() => setSelectedStrategy('yield')}
+                className={`w-full p-4 rounded-xl border-2 transition-all cursor-pointer text-left ${
+                  selectedStrategy === 'yield'
+                    ? 'border-[#1C1B18] bg-[#FAFAF8]'
+                    : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#EDF5F0] flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#22C55E]">
+                      <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-[#1C1B18]">Yield Vault</p>
+                    <p className="text-sm text-[#6B6960]">Receive USDC → auto-deposit to Aave/Morpho</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-[#22C55E]">4-5%</p>
+                    <p className="text-xs text-[#6B6960]">APY</p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setSelectedStrategy('restaking')}
+                className={`w-full p-4 rounded-xl border-2 transition-all cursor-pointer text-left ${
+                  selectedStrategy === 'restaking'
+                    ? 'border-[#7C3AED] bg-[#F5F3FF]'
+                    : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#F5F3FF] flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#7C3AED]">
+                      <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-[#1C1B18]">Restaking</p>
+                    <p className="text-sm text-[#6B6960]">Receive WETH → auto-deposit to Renzo</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-[#7C3AED]">Points</p>
+                    <p className="text-xs text-[#6B6960]">EigenLayer</p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setSelectedStrategy('liquid')}
+                className={`w-full p-4 rounded-xl border-2 transition-all cursor-pointer text-left ${
+                  selectedStrategy === 'liquid'
+                    ? 'border-[#6B7280] bg-[#F9FAFB]'
+                    : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#F3F4F6] flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#6B7280]">
+                      <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-[#1C1B18]">Liquid</p>
+                    <p className="text-sm text-[#6B6960]">Keep USDC in wallet (no DeFi)</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-[#6B7280]">0%</p>
+                    <p className="text-xs text-[#6B6960]">APY</p>
+                  </div>
+                </div>
+              </button>
+
+              {/* Save button - only show if strategy changed */}
+              {strategyChanged && (
+                <Button
+                  onClick={handleSaveStrategy}
+                  disabled={savingStrategy}
+                  className={`w-full ${
+                    selectedStrategy === 'restaking'
+                      ? 'bg-[#7C3AED] hover:bg-[#6D28D9]'
+                      : 'bg-[#1C1B18] hover:bg-[#2D2C28]'
+                  } text-white mt-2`}
+                >
+                  {savingStrategy ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                      Confirm in wallet...
+                    </span>
+                  ) : (
+                    `Save ${selectedStrategy === 'restaking' ? 'Restaking' : selectedStrategy === 'liquid' ? 'Liquid' : 'Yield'} Strategy to ENS`
+                  )}
+                </Button>
+              )}
+
+              {/* Current strategy indicator */}
+              {currentStrategy && !strategyChanged && !useMultiStrategy && (
+                <div className="flex items-center justify-center gap-2 text-sm text-[#22C55E]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span>Strategy saved on-chain</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Multi-Strategy Mode */}
+          {useMultiStrategy && (
+            <div className="space-y-3">
+              <p className="text-xs text-[#6B6960]">
+                Split incoming payments across multiple DeFi strategies
+              </p>
+
+              {strategyAllocations.map((alloc, index) => (
+                <div key={alloc.strategy} className="flex items-center gap-3 p-3 rounded-lg bg-[#FAFAF8]">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    alloc.strategy === 'yield' ? 'bg-[#EDF5F0]' :
+                    alloc.strategy === 'restaking' ? 'bg-[#F5F3FF]' :
+                    'bg-[#F3F4F6]'
+                  }`}>
+                    {alloc.strategy === 'yield' && (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#22C55E]">
+                        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    {alloc.strategy === 'restaking' && (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#7C3AED]">
+                        <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    {alloc.strategy === 'liquid' && (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#6B7280]">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm text-[#1C1B18] capitalize">{alloc.strategy}</p>
+                    <p className="text-xs text-[#6B6960]">
+                      {alloc.strategy === 'yield' ? 'USDC → Aave/Morpho' :
+                       alloc.strategy === 'restaking' ? 'WETH → Renzo ezETH' :
+                       'Keep USDC liquid'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={alloc.percentage}
+                      onChange={(e) => updateStrategyAllocation(index, parseInt(e.target.value))}
+                      className={`w-24 ${
+                        alloc.strategy === 'yield' ? 'accent-[#22C55E]' :
+                        alloc.strategy === 'restaking' ? 'accent-[#7C3AED]' :
+                        'accent-[#6B7280]'
+                      }`}
+                    />
+                    <span className="w-12 text-right font-mono text-sm text-[#1C1B18]">
+                      {alloc.percentage}%
+                    </span>
+                    {strategyAllocations.length > 1 && (
+                      <button
+                        onClick={() => removeStrategyAllocation(index)}
+                        className="p-1 text-[#9C9B93] hover:text-red-500"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Add strategy button */}
+              {strategyAllocations.length < 3 && (
+                <button
+                  onClick={addStrategyAllocation}
+                  className="w-full p-3 rounded-lg border-2 border-dashed border-[#E4E2DC] text-sm text-[#6B6960] hover:border-[#1C1B18] hover:text-[#1C1B18] transition-colors"
+                >
+                  + Add Strategy
+                </button>
+              )}
+
+              {/* Total indicator */}
+              <div className={`flex items-center justify-between p-3 rounded-lg ${
+                strategyAllocationTotal === 100 ? 'bg-[#EDF5F0]' : 'bg-[#FFF3E0]'
+              }`}>
+                <span className="text-sm font-medium text-[#1C1B18]">Total Allocation</span>
+                <span className={`font-mono font-semibold ${
+                  strategyAllocationTotal === 100 ? 'text-[#22C55E]' : 'text-[#E65100]'
+                }`}>
+                  {strategyAllocationTotal}%
+                </span>
+              </div>
+
+              {strategyAllocationTotal !== 100 && (
+                <p className="text-xs text-[#E65100]">
+                  Allocations must sum to 100%
+                </p>
+              )}
+
+              {/* Save button */}
+              {multiStrategyChanged && (
+                <Button
+                  onClick={handleSaveMultiStrategy}
+                  disabled={savingStrategy || strategyAllocationTotal !== 100}
+                  className="w-full bg-[#1C1B18] hover:bg-[#2D2C28] text-white"
+                >
+                  {savingStrategy ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                      Confirm in wallet...
+                    </span>
+                  ) : (
+                    'Save Multi-Strategy to ENS'
+                  )}
+                </Button>
+              )}
+
+              {/* Current multi-strategy indicator */}
+              {currentStrategies && !multiStrategyChanged && (
+                <div className="flex items-center justify-center gap-2 text-sm text-[#22C55E]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span>Multi-strategy saved on-chain</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Success message */}
+          {strategySuccess && strategyTxHash && (
+            <div className="rounded-lg bg-[#EDF5F0] border border-[#B7D4C7] p-3 mt-2">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-lg bg-[#22C55E] flex items-center justify-center flex-shrink-0">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-white">
+                    <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#2D6A4F]">
+                    Strategy saved to ENS!
+                  </p>
+                  <p className="text-xs text-[#2D6A4F]/70 mt-1">
+                    <span className="font-medium">Record:</span> {useMultiStrategy ? `flowfi.strategies → ${formatStrategiesForENS()}` : `flowfi.strategy → ${selectedStrategy}`}
+                  </p>
+                  <a
+                    href={`https://etherscan.io/tx/${strategyTxHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-[#2D6A4F] hover:underline mt-1 inline-block"
+                  >
+                    View transaction →
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error message */}
+          {strategyError && (
+            <p className="text-sm text-red-600 mt-2">{strategyError}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Yield Vault Selection - only show if yield strategy */}
+      {selectedStrategy === 'yield' && (
+      <Card className="border-[#E4E2DC] bg-white">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-semibold text-[#1C1B18]">
+                Yield Vault
+              </CardTitle>
+              <p className="text-sm text-[#6B6960]">
+                Choose a vault based on your risk preference
               </p>
             </div>
             {currentVault && !vaultChanged && (
@@ -586,66 +1410,159 @@ export function ReceiverDashboard() {
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {VAULT_OPTIONS.map((vault) => (
-            <button
-              key={vault.id}
-              onClick={() => setSelectedVaultId(vault.id)}
-              className={`w-full p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex items-center justify-between ${
-                selectedVaultId === vault.id
-                  ? 'border-[#1C1B18] bg-[#FAFAF8]'
-                  : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                  vault.id === 'none' ? 'bg-[#F8F7F4]' : 'bg-[#EDF5F0]'
-                }`}>
-                  {vault.id === 'none' ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#6B6960]">
-                      <path d="M21 12H3M21 12L15 6M21 12L15 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#22C55E]">
-                      <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <p className="font-medium text-[#1C1B18]">{vault.name}</p>
-                  <p className="text-sm text-[#6B6960]">{vault.protocol}</p>
-                </div>
+        <CardContent className="space-y-4">
+          {/* Low Risk Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-[#22C55E]" />
+              <span className="text-xs font-medium text-[#6B6960] uppercase tracking-wide">Low Risk</span>
+            </div>
+            <div className="space-y-2">
+              {VAULT_OPTIONS.filter(v => v.risk === 'low' && v.id !== 'none').map((vault) => (
+                <button
+                  key={vault.id}
+                  onClick={() => setSelectedVaultId(vault.id)}
+                  className={`w-full p-3 rounded-xl border-2 transition-all cursor-pointer text-left flex items-center justify-between ${
+                    selectedVaultId === vault.id
+                      ? 'border-[#22C55E] bg-[#F0FDF4]'
+                      : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-[#EDF5F0] flex items-center justify-center">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#22C55E]">
+                        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" strokeWidth="2"/>
+                        <path d="M9 12L11 14L15 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm text-[#1C1B18]">{vault.name}</p>
+                      <p className="text-xs text-[#6B6960]">{vault.description}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-[#22C55E]">{vaultApys[vault.id] ?? '—'}%</p>
+                    <p className="text-xs text-[#6B6960]">APY</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Medium Risk Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+              <span className="text-xs font-medium text-[#6B6960] uppercase tracking-wide">Medium Risk · Higher Yield</span>
+            </div>
+            <div className="space-y-2">
+              {VAULT_OPTIONS.filter(v => v.risk === 'medium').map((vault) => (
+                <button
+                  key={vault.id}
+                  onClick={() => setSelectedVaultId(vault.id)}
+                  className={`w-full p-3 rounded-xl border-2 transition-all cursor-pointer text-left flex items-center justify-between ${
+                    selectedVaultId === vault.id
+                      ? 'border-[#F59E0B] bg-[#FFFBEB]'
+                      : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-[#FEF3C7] flex items-center justify-center">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#F59E0B]">
+                        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm text-[#1C1B18]">{vault.name}</p>
+                      <p className="text-xs text-[#6B6960]">{vault.description}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-[#F59E0B]">{vaultApys[vault.id] ?? '—'}%</p>
+                    <p className="text-xs text-[#6B6960]">APY</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* High Risk Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-[#EF4444]" />
+              <span className="text-xs font-medium text-[#6B6960] uppercase tracking-wide">Higher Risk · Aggressive</span>
+            </div>
+            <div className="space-y-2">
+              {VAULT_OPTIONS.filter(v => v.risk === 'high').map((vault) => (
+                <button
+                  key={vault.id}
+                  onClick={() => setSelectedVaultId(vault.id)}
+                  className={`w-full p-3 rounded-xl border-2 transition-all cursor-pointer text-left flex items-center justify-between ${
+                    selectedVaultId === vault.id
+                      ? 'border-[#EF4444] bg-[#FEF2F2]'
+                      : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-[#FEE2E2] flex items-center justify-center">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#EF4444]">
+                        <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm text-[#1C1B18]">{vault.name}</p>
+                      <p className="text-xs text-[#6B6960]">{vault.description}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-[#EF4444]">{vaultApys[vault.id] ?? '—'}%</p>
+                    <p className="text-xs text-[#6B6960]">APY</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* No Yield Option */}
+          <button
+            onClick={() => setSelectedVaultId('none')}
+            className={`w-full p-3 rounded-xl border-2 transition-all cursor-pointer text-left flex items-center justify-between ${
+              selectedVaultId === 'none'
+                ? 'border-[#6B7280] bg-[#F9FAFB]'
+                : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[#F3F4F6] flex items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#6B7280]">
+                  <path d="M21 12H3M21 12L15 6M21 12L15 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
-              {vault.id !== 'none' && (
-                <div className="text-right">
-                  <p className="font-semibold text-[#22C55E]">
-                    {vaultApys[vault.id] ?? '—'}%
-                  </p>
-                  <p className="text-xs text-[#6B6960]">APY</p>
-                </div>
-              )}
-            </button>
-          ))}
+              <div>
+                <p className="font-medium text-sm text-[#1C1B18]">No Yield</p>
+                <p className="text-xs text-[#6B6960]">Keep USDC liquid in wallet</p>
+              </div>
+            </div>
+          </button>
 
           {/* Custom vault option */}
           <button
             onClick={() => setSelectedVaultId('custom')}
-            className={`w-full p-4 rounded-xl border-2 transition-all cursor-pointer text-left ${
+            className={`w-full p-3 rounded-xl border-2 border-dashed transition-all cursor-pointer text-left ${
               selectedVaultId === 'custom'
                 ? 'border-[#1C1B18] bg-[#FAFAF8]'
                 : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#F8F7F4] flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#6B6960]">
+              <div className="w-9 h-9 rounded-lg bg-[#F8F7F4] flex items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#6B6960]">
                   <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
               </div>
               <div>
-                <p className="font-medium text-[#1C1B18]">Custom Vault</p>
-                <p className="text-sm text-[#6B6960]">Any ERC-4626 vault on Base</p>
+                <p className="font-medium text-sm text-[#1C1B18]">Custom Vault</p>
+                <p className="text-xs text-[#6B6960]">Any ERC-4626 vault on Base</p>
               </div>
             </div>
           </button>
@@ -719,6 +1636,288 @@ export function ReceiverDashboard() {
 
         </CardContent>
       </Card>
+      )}
+
+      {/* Advanced: SmartVaultHook Multi-Vault Allocation - only show if yield strategy */}
+      {selectedStrategy === 'yield' && (
+      <Card className="border-[#E4E2DC] bg-white">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-semibold text-[#1C1B18]">
+                Advanced Yield Settings
+              </CardTitle>
+              <p className="text-sm text-[#6B6960]">
+                Split deposits across vaults or enable APY-based routing
+              </p>
+            </div>
+            {smartVaultConfig && smartVaultConfig.allocations.length > 0 && (
+              <span className="text-xs text-[#22C55E] font-medium">On-chain</span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Mode Toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setUseMultiVault(false)
+                setUseConditionalRouting(false)
+              }}
+              className={`flex-1 p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                !useMultiVault && !useConditionalRouting
+                  ? 'border-[#1C1B18] bg-[#FAFAF8]'
+                  : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+              }`}
+            >
+              Single Vault
+            </button>
+            <button
+              onClick={() => {
+                setUseMultiVault(true)
+                setUseConditionalRouting(false)
+              }}
+              className={`flex-1 p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                useMultiVault && !useConditionalRouting
+                  ? 'border-[#1C1B18] bg-[#FAFAF8]'
+                  : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+              }`}
+            >
+              Split Vaults
+            </button>
+            <button
+              onClick={() => {
+                setUseMultiVault(false)
+                setUseConditionalRouting(true)
+              }}
+              className={`flex-1 p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                useConditionalRouting
+                  ? 'border-[#1C1B18] bg-[#FAFAF8]'
+                  : 'border-[#E4E2DC] hover:border-[#C9C7BF]'
+              }`}
+            >
+              Best APY
+            </button>
+          </div>
+
+          {/* Multi-Vault Allocation UI */}
+          {useMultiVault && !useConditionalRouting && (
+            <div className="space-y-3 pt-2">
+              <p className="text-xs text-[#6B6960]">
+                Split incoming payments across multiple vaults
+              </p>
+
+              {multiVaultAllocations.map((alloc, index) => (
+                <div key={alloc.vault.id} className="flex items-center gap-3 p-3 rounded-lg bg-[#FAFAF8]">
+                  <div className="flex-1">
+                    <p className="font-medium text-[#1C1B18] text-sm">{alloc.vault.name}</p>
+                    <p className="text-xs text-[#6B6960]">{alloc.vault.protocol}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={alloc.percentage}
+                      onChange={(e) => updateAllocation(index, parseInt(e.target.value))}
+                      className="w-24 accent-[#1C1B18]"
+                    />
+                    <span className="w-12 text-right font-mono text-sm text-[#1C1B18]">
+                      {alloc.percentage}%
+                    </span>
+                    {multiVaultAllocations.length > 1 && (
+                      <button
+                        onClick={() => removeVaultAllocation(index)}
+                        className="p-1 text-[#9C9B93] hover:text-red-500"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Add vault button */}
+              {multiVaultAllocations.length < VAULT_OPTIONS.filter(v => v.id !== 'none').length && (
+                <button
+                  onClick={addVaultAllocation}
+                  className="w-full p-3 rounded-lg border-2 border-dashed border-[#E4E2DC] text-sm text-[#6B6960] hover:border-[#1C1B18] hover:text-[#1C1B18] transition-colors"
+                >
+                  + Add Vault
+                </button>
+              )}
+
+              {/* Total indicator */}
+              <div className={`flex items-center justify-between p-3 rounded-lg ${
+                totalAllocation === 100 ? 'bg-[#EDF5F0]' : 'bg-[#FFF3E0]'
+              }`}>
+                <span className="text-sm font-medium text-[#1C1B18]">Total Allocation</span>
+                <span className={`font-mono font-semibold ${
+                  totalAllocation === 100 ? 'text-[#22C55E]' : 'text-[#E65100]'
+                }`}>
+                  {totalAllocation}%
+                </span>
+              </div>
+
+              {totalAllocation !== 100 && (
+                <p className="text-xs text-[#E65100]">
+                  Allocations must sum to 100%
+                </p>
+              )}
+
+              <Button
+                onClick={handleSaveMultiVault}
+                disabled={savingMultiVault || totalAllocation !== 100}
+                className="w-full bg-[#1C1B18] hover:bg-[#2D2C28] text-white"
+              >
+                {savingMultiVault ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    Confirm in wallet...
+                  </span>
+                ) : (
+                  'Save to SmartVaultHook (Base)'
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Conditional Routing (Best APY) UI */}
+          {useConditionalRouting && (
+            <div className="space-y-3 pt-2">
+              <div className="p-4 rounded-lg bg-[#EDF5F0] border border-[#B7D4C7]">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#22C55E] flex items-center justify-center flex-shrink-0">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-white">
+                      <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-medium text-[#2D6A4F]">Auto-route to Highest APY</p>
+                    <p className="text-xs text-[#2D6A4F]/70 mt-1">
+                      SmartVaultHook will automatically deposit to the vault with the best yield at payment time
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-xs text-[#6B6960]">
+                Vaults considered:
+              </div>
+              <div className="space-y-2">
+                {VAULT_OPTIONS.filter(v => v.id !== 'none').map((vault) => (
+                  <div key={vault.id} className="flex items-center justify-between p-3 rounded-lg bg-[#FAFAF8]">
+                    <div>
+                      <p className="font-medium text-sm text-[#1C1B18]">{vault.name}</p>
+                      <p className="text-xs text-[#6B6960]">{vault.protocol}</p>
+                    </div>
+                    <span className="font-semibold text-[#22C55E]">
+                      {vaultApys[vault.id] ?? '—'}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                onClick={handleToggleConditionalRouting}
+                disabled={savingMultiVault}
+                className={`w-full ${
+                  smartVaultConfig?.conditionalRoutingEnabled
+                    ? 'bg-red-500 hover:bg-red-600'
+                    : 'bg-[#1C1B18] hover:bg-[#2D2C28]'
+                } text-white`}
+              >
+                {savingMultiVault ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    Confirm in wallet...
+                  </span>
+                ) : smartVaultConfig?.conditionalRoutingEnabled ? (
+                  'Disable Conditional Routing'
+                ) : (
+                  'Enable Conditional Routing (Base)'
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Success/Error messages */}
+          {multiVaultSuccess && multiVaultTxHash && (
+            <div className="rounded-lg bg-[#EDF5F0] border border-[#B7D4C7] p-3">
+              <p className="text-sm font-medium text-[#2D6A4F]">
+                Settings saved to SmartVaultHook!
+              </p>
+              <a
+                href={`https://basescan.org/tx/${multiVaultTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[#2D6A4F]/70 hover:underline mt-1 inline-flex items-center gap-1"
+              >
+                View on BaseScan
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                  <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </a>
+            </div>
+          )}
+
+          {multiVaultError && (
+            <p className="text-sm text-red-600">{multiVaultError}</p>
+          )}
+
+          <p className="text-xs text-center text-[#6B6960]">
+            Advanced settings are stored on Base via SmartVaultHook
+          </p>
+        </CardContent>
+      </Card>
+      )}
+
+      {/* Receipt NFTs from SmartVaultHook */}
+      {smartVaultReceipts.length > 0 && (
+        <Card className="border-[#E4E2DC] bg-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-[#1C1B18]">
+              Payment Receipts (NFTs)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {smartVaultReceipts.slice(0, 5).map((receipt) => (
+                <div
+                  key={receipt.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-[#FAFAF8]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#627EEA] to-[#C99FFF] flex items-center justify-center">
+                      <span className="text-xs font-bold text-white">#{receipt.nftId}</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-[#1C1B18]">
+                        +{receipt.amount} {receipt.tokenSymbol}
+                      </p>
+                      <p className="text-xs text-[#6B6960]">
+                        From {receipt.sender.slice(0, 6)}...{receipt.sender.slice(-4)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-[#6B6960]">
+                      {new Date(receipt.timestamp).toLocaleDateString()}
+                    </p>
+                    {receipt.deposits.length > 1 && (
+                      <p className="text-xs text-[#22C55E]">
+                        Split to {receipt.deposits.length} vaults
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent Payments */}
       <Card className="border-[#E4E2DC] bg-white">

@@ -35,6 +35,8 @@ export async function resolveENS(name: string): Promise<ENSResolution> {
   let avatar: string | undefined
   let description: string | undefined
   let yieldVault: string | undefined
+  let strategy: string | undefined
+  let strategies: string | undefined
 
   // Check offchain store first (free preferences take precedence for token + chain)
   try {
@@ -57,6 +59,8 @@ export async function resolveENS(name: string): Promise<ENSResolution> {
       'avatar',
       'description',
       'yieldroute.vault',
+      'flowfi.strategy',
+      'flowfi.strategies',
     ] as const
 
     const results = await Promise.all(
@@ -77,6 +81,8 @@ export async function resolveENS(name: string): Promise<ENSResolution> {
     avatar = results[5]
     description = results[6]
     yieldVault = results[7]
+    strategy = results[8]
+    strategies = results[9]
   } catch {
     // Text records not set, that's fine
   }
@@ -91,6 +97,8 @@ export async function resolveENS(name: string): Promise<ENSResolution> {
     avatar,
     description,
     yieldVault,
+    strategy,
+    strategies,
   }
 }
 

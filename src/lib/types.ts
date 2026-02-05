@@ -12,7 +12,7 @@ export type RouteOption = {
 }
 
 export type ParsedIntent = {
-  action: 'transfer' | 'swap' | 'deposit' | 'yield' | 'consolidate'
+  action: 'transfer' | 'swap' | 'deposit' | 'yield' | 'consolidate' | 'restaking'
   amount: string
   fromToken: string
   toToken: string
@@ -46,6 +46,10 @@ export type ENSResolution = {
   description?: string
   /** yieldroute.vault — ERC-4626 vault address for auto-yield deposits */
   yieldVault?: string
+  /** flowfi.strategy — DeFi strategy: "yield" | "restaking" | "liquid" */
+  strategy?: string
+  /** flowfi.strategies — Multi-strategy allocation: "yield:50,restaking:50" */
+  strategies?: string
 }
 
 /**

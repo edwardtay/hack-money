@@ -3,8 +3,10 @@ import { resolveENS, resolveChainAddress } from '@/lib/ens/resolve'
 import { findRoutes } from '@/lib/routing/lifi-router'
 import { findV4Routes } from '@/lib/routing/v4-router'
 import { getYieldRouteQuote, isYieldRouteEnabled } from '@/lib/routing/yield-router'
+import { getRestakingRouteQuote, isRestakingStrategy } from '@/lib/routing/restaking-router'
 import { getTokenAddress, getPreferredChainForToken, CHAIN_MAP, CHAIN_ID_TO_NAME } from '@/lib/routing/tokens'
 import { isRateLimited } from '@/lib/rate-limit'
+import { getStrategy, parseStrategyAllocation, type StrategyAllocation } from '@/lib/strategies'
 
 /**
  * POST /api/quote - Get payment routes without NLP parsing
@@ -53,6 +55,9 @@ export async function POST(req: NextRequest) {
     let ensSlippage: number | undefined
     let ensMaxFee: string | undefined
     let yieldVault: string | undefined
+    let ensStrategy: string | undefined
+    let ensStrategies: string | undefined
+    let strategyAllocations: StrategyAllocation[] = []
     let toChain = requestedToChain || fromChain
 
     if (toAddress.endsWith('.eth')) {
@@ -76,6 +81,11 @@ export async function POST(req: NextRequest) {
       }
       ensMaxFee = ensResult.maxFee
       yieldVault = ensResult.yieldVault
+      ensStrategy = ensResult.strategy
+      ensStrategies = ensResult.strategies
+
+      // Parse strategy allocation (multi-strategy takes precedence)
+      strategyAllocations = parseStrategyAllocation(ensStrategy, ensStrategies)
     }
 
     // Determine final toToken (use fromToken if not specified, or ENS preference)
@@ -104,8 +114,44 @@ export async function POST(req: NextRequest) {
 
     let allRoutes: Awaited<ReturnType<typeof findRoutes>> = []
 
-    // --- YIELD ROUTE: If recipient has vault, use Contract Calls for atomic deposit ---
-    if (isYieldRouteEnabled(yieldVault)) {
+    // Get the strategy configuration
+    const strategy = getStrategy(ensStrategy)
+
+    // --- RESTAKING ROUTE: If strategy is restaking, route to Renzo ---
+    if (isRestakingStrategy(ensStrategy)) {
+      const restakingResult = await getRestakingRouteQuote({
+        fromAddress: userAddress,
+        fromChain,
+        fromToken,
+        amount,
+        recipient: resolvedAddress,
+        slippage: effectiveSlippage,
+      })
+
+      if ('error' in restakingResult) {
+        // Fall back to standard routes if restaking route fails
+        console.warn('Restaking route failed, falling back to standard:', restakingResult.error)
+      } else {
+        // Restaking route found - bridges + deposits to Renzo in ONE tx
+        allRoutes = [restakingResult.route]
+
+        return NextResponse.json({
+          routes: allRoutes,
+          resolvedAddress,
+          toChain: 'base', // Renzo is on Base
+          toToken: 'ezETH',
+          strategy: strategy.id,
+          strategyName: strategy.name,
+          protocol: strategy.protocol,
+          useRestakingRoute: true,
+          strategyAllocations: strategyAllocations.length > 1 ? strategyAllocations : undefined,
+          isMultiStrategy: strategyAllocations.length > 1,
+        })
+      }
+    }
+
+    // --- YIELD ROUTE: If recipient has vault (and not restaking), use Contract Calls for atomic deposit ---
+    if (isYieldRouteEnabled(yieldVault) && !isRestakingStrategy(ensStrategy)) {
       const yieldResult = await getYieldRouteQuote({
         fromAddress: userAddress,
         fromChain,
@@ -129,7 +175,11 @@ export async function POST(req: NextRequest) {
           toChain: 'base', // YieldRouter is always on Base
           toToken: 'USDC',
           yieldVault, // Include vault so execute knows to use yield route
+          strategy: strategy.id,
+          strategyName: strategy.name,
           useYieldRoute: true,
+          strategyAllocations: strategyAllocations.length > 1 ? strategyAllocations : undefined,
+          isMultiStrategy: strategyAllocations.length > 1,
         })
       }
     }
@@ -196,6 +246,9 @@ export async function POST(req: NextRequest) {
       toToken: finalToToken,
       yieldVault: yieldVault || null,
       useYieldRoute: false,
+      // Multi-strategy allocation info
+      strategyAllocations: strategyAllocations.length > 1 ? strategyAllocations : undefined,
+      isMultiStrategy: strategyAllocations.length > 1,
     })
   } catch (error: unknown) {
     console.error('Quote API error:', error)
