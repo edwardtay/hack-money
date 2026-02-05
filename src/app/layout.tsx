@@ -23,9 +23,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AcceptAny — Accept any token, earn yield",
+  title: "FlowFi — Accept any token, earn yield",
   description:
-    "Accept any token on any chain. Auto-convert to USDC and deposit to yield vaults via ENS + Uniswap v4.",
+    "Accept any token on any chain. Auto-convert to USDC and deposit to yield vaults via ENS + Uniswap v4 + LI.FI.",
 };
 
 export default function RootLayout({

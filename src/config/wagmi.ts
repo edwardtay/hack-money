@@ -17,7 +17,7 @@ let _config: ReturnType<typeof getDefaultConfig> | null = null
 export function getConfig() {
   if (!_config) {
     _config = getDefaultConfig({
-      appName: 'AcceptAny',
+      appName: 'FlowFi',
       projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || 'demo',
       chains: [mainnet, base, arbitrum, optimism, polygon, avalanche, bsc, zkSync, linea],
       ssr: true,

@@ -12,7 +12,7 @@ export default function LandingPage() {
                 <path d="M8 1L14.5 5V11L8 15L1.5 11V5L8 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
               </svg>
             </div>
-            <span className="text-sm font-semibold text-[#1C1B18]">AcceptAny</span>
+            <span className="text-sm font-semibold text-[#1C1B18]">FlowFi</span>
           </div>
           <Link
             href="/app"

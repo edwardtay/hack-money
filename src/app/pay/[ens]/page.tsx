@@ -24,7 +24,7 @@ export default async function PayPage({ params, searchParams }: Props) {
               </svg>
             </div>
             <span className="text-[15px] font-semibold tracking-tight text-[#1C1B18]">
-              AcceptAny
+              FlowFi
             </span>
           </Link>
         </div>
