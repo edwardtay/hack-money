@@ -55,10 +55,10 @@ export default function HomePage() {
         <div className="max-w-2xl text-center py-12">
           {/* Main headline */}
           <h1 className="font-[family-name:var(--font-display)] text-4xl sm:text-5xl text-[#1C1B18] mb-4 leading-tight">
-            One link. Any crypto.<br />Auto-compounding.
+            Your customers pay<br /><span className="text-[#22C55E]">$0 gas. Ever.</span>
           </h1>
           <p className="text-lg text-[#6B6A63] mb-8 max-w-lg mx-auto">
-            Why let payments sit idle? Every dollar you receive starts earning immediately.
+            AI agent manages your gas tank automatically. You set it up once, it runs forever.
           </p>
 
           <ConnectButton.Custom>
@@ -75,21 +75,38 @@ export default function HomePage() {
             )}
           </ConnectButton.Custom>
 
-          {/* Benefits - compact */}
-          <div className="flex items-center justify-center gap-8 mt-10 text-sm">
-            <div className="text-center">
-              <p className="font-semibold text-[#1C1B18]">Any token, 9 chains</p>
-              <p className="text-[#9C9B93]">You receive USDC</p>
+          {/* How it works - 3 steps */}
+          <div className="flex items-start justify-center gap-6 mt-12 text-sm max-w-xl mx-auto">
+            <div className="flex-1 text-center">
+              <div className="w-10 h-10 rounded-full bg-[#1C1B18] text-white flex items-center justify-center mx-auto mb-2 text-sm font-semibold">1</div>
+              <p className="font-semibold text-[#1C1B18]">Fund gas tank</p>
+              <p className="text-[#9C9B93] text-xs mt-1">One-time 0.005 ETH</p>
             </div>
-            <div className="w-px h-8 bg-[#E4E2DC]" />
-            <div className="text-center">
-              <p className="font-semibold text-[#22C55E]">4-8% APY</p>
-              <p className="text-[#9C9B93]">Auto-compounding</p>
+            <div className="flex-1 text-center">
+              <div className="w-10 h-10 rounded-full bg-[#1C1B18] text-white flex items-center justify-center mx-auto mb-2 text-sm font-semibold">2</div>
+              <p className="font-semibold text-[#1C1B18]">Share your link</p>
+              <p className="text-[#9C9B93] text-xs mt-1">pay/yourname.eth</p>
             </div>
-            <div className="w-px h-8 bg-[#E4E2DC]" />
-            <div className="text-center">
-              <p className="font-semibold text-[#1C1B18]">One link</p>
-              <p className="text-[#9C9B93]">No setup for payers</p>
+            <div className="flex-1 text-center">
+              <div className="w-10 h-10 rounded-full bg-[#22C55E] text-white flex items-center justify-center mx-auto mb-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <p className="font-semibold text-[#1C1B18]">AI keeps it full</p>
+              <p className="text-[#9C9B93] text-xs mt-1">Auto-refills from cheapest chain</p>
+            </div>
+          </div>
+
+          {/* Secondary benefits */}
+          <div className="mt-10 pt-8 border-t border-[#E4E2DC]">
+            <p className="text-xs text-[#9C9B93] mb-3">ALSO INCLUDED</p>
+            <div className="flex items-center justify-center gap-6 text-sm">
+              <span className="text-[#6B6960]">Any token, 9 chains</span>
+              <span className="text-[#6B6960]">·</span>
+              <span className="text-[#6B6960]">Auto-convert to USDC</span>
+              <span className="text-[#6B6960]">·</span>
+              <span className="text-[#22C55E] font-medium">4-8% APY on idle funds</span>
             </div>
           </div>
         </div>

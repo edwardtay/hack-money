@@ -41,10 +41,10 @@ export default function SetupPage() {
       <main className="max-w-4xl mx-auto px-4 py-12">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-semibold text-[#1C1B18] mb-2">
-            Set Up Your Payment Account
+            Enable $0 Gas Payments
           </h1>
           <p className="text-[#6B6960]">
-            One-time setup. Then receive gasless payments forever.
+            Fund your gas tank once. AI agent keeps it running forever.
           </p>
         </div>
 

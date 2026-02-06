@@ -367,7 +367,7 @@ export function ReceiverDashboard() {
                   {gasTank.loading ? (
                     <span className="inline-block h-4 w-20 bg-[#E4E2DC] rounded animate-pulse" />
                   ) : gasTank.status?.estimatedPayments ? (
-                    <>~{gasTank.status.estimatedPayments} payments funded</>
+                    <>~{gasTank.status.estimatedPayments} gasless payments</>
                   ) : (
                     <>Not activated</>
                   )}
@@ -384,14 +384,20 @@ export function ReceiverDashboard() {
               )}
             </div>
           </div>
+          {gasTank.status?.estimatedPayments !== undefined && gasTank.status.estimatedPayments > 0 && (
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#E4E2DC]">
+              <div className="w-2 h-2 rounded-full bg-[#22C55E] animate-pulse" />
+              <p className="text-xs text-[#22C55E]">AI agent monitoring • Auto-refills when low</p>
+            </div>
+          )}
           {gasTank.status?.estimatedPayments !== undefined && gasTank.status.estimatedPayments < 20 && gasTank.status.estimatedPayments > 0 && (
-            <p className="text-xs text-[#E65100] mt-3 pt-3 border-t border-[#E4E2DC]">
-              Low balance - add funds in settings to keep receiving payments
+            <p className="text-xs text-[#E65100] mt-2">
+              Low balance - AI agent will refill from your cheapest chain
             </p>
           )}
           {!gasTank.status?.canReceive && gasTank.status !== null && (
             <p className="text-xs text-[#E65100] mt-3 pt-3 border-t border-[#E4E2DC]">
-              Gas tank empty - add funds to receive gasless payments
+              Gas tank empty - add funds to enable gasless payments
             </p>
           )}
         </CardContent>

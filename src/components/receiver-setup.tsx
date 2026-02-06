@@ -35,10 +35,10 @@ export function ReceiverSetup({ ensName, onComplete }: Props) {
       <Card className="border-[#E4E2DC] bg-white max-w-md mx-auto">
         <CardContent className="p-6 text-center space-y-4">
           <h2 className="text-xl font-semibold text-[#1C1B18]">
-            Create Your Payment Link
+            Zero-Gas Payment Link
           </h2>
           <p className="text-sm text-[#6B6960]">
-            Connect wallet to start receiving payments with auto-compounding yield.
+            Connect wallet. Your customers will never pay gas fees.
           </p>
           <ConnectButton />
         </CardContent>
@@ -68,7 +68,7 @@ export function ReceiverSetup({ ensName, onComplete }: Props) {
           </div>
 
           <p className="text-xs text-[#6B6960]">
-            Earning ~4.5% APY on Aave • {gasTank.status?.estimatedPayments || 100}+ payments funded
+            {gasTank.status?.estimatedPayments || 100}+ gasless payments funded • AI agent monitoring
           </p>
         </CardContent>
       </Card>
@@ -80,26 +80,26 @@ export function ReceiverSetup({ ensName, onComplete }: Props) {
       <CardContent className="p-6 space-y-5">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-[#1C1B18]">
-            Activate Your Account
+            Fund Your Gas Tank
           </h2>
           <p className="text-sm text-[#6B6960] mt-1">
-            One transaction to start receiving.
+            One deposit. AI agent handles the rest.
           </p>
         </div>
 
         {/* What you get */}
         <div className="rounded-lg bg-[#F8F7F4] p-4 space-y-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-[#6B6960]">Yield vault</span>
-            <span className="text-[#1C1B18] font-medium">Aave (~4.5% APY)</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-[#6B6960]">Gas deposit</span>
+            <span className="text-[#6B6960]">Gas tank deposit</span>
             <span className="text-[#1C1B18] font-medium">0.005 ETH</span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-[#6B6960]">Covers</span>
-            <span className="text-[#1C1B18] font-medium">~100 payments</span>
+            <span className="text-[#1C1B18] font-medium">~100 gasless payments</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-[#6B6960]">AI agent</span>
+            <span className="text-[#22C55E] font-medium">Auto-refills when low</span>
           </div>
         </div>
 
