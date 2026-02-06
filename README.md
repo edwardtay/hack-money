@@ -114,6 +114,36 @@ FlowFi uses LI.FI for cross-chain swaps and aggregated routing across 30+ chains
 3. Contract Call executes on Base (YieldRouter or RestakingRouter)
 4. Funds arrive in recipient's chosen DeFi strategy
 
+## AI Payment Agent
+
+FlowFi includes an autonomous AI agent that monitors gas tanks and executes refills.
+
+**Agent-Executed Transaction (Real):**
+- TX: [0x905a9c5a...73b6838](https://basescan.org/tx/0x905a9c5a75ece7158372b26cc161b30dd4ec17309ef6afabd158f83de73b6838)
+- Action: 0.1 USDC → 0.099 USDT swap on Base
+- Integrator: `flowfi-agent`
+- Triggered via: `/api/agent/cron?action=execute`
+
+**Agent Capabilities:**
+- Monitor receiver gas tanks across chains
+- Auto-refill low tanks via LI.FI bridging
+- Execute scheduled subscription payments
+- Route swaps through Uniswap v4 PayAgentHook
+
+## ENS Subdomains for Invoices
+
+FlowFi creates ENS subdomains for invoices, demonstrating deeper ENS integration:
+
+```
+inv-{invoiceId}.yourname.eth → invoice data
+```
+
+**Features:**
+- Each invoice gets its own subdomain
+- Invoice hash stored as text record
+- Payment URL: `flowfi.xyz/pay/inv-123.yourname.eth`
+- Verifiable on-chain invoice proof
+
 ## Getting Started
 
 ```bash

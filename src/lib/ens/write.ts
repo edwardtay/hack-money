@@ -1,4 +1,4 @@
-import { createPublicClient, encodeFunctionData, http, namehash, keccak256, toHex } from 'viem'
+import { createPublicClient, encodeFunctionData, http, namehash, keccak256, toHex, labelhash } from 'viem'
 import { normalize } from 'viem/ens'
 import { mainnet } from 'viem/chains'
 
@@ -6,6 +6,10 @@ const client = createPublicClient({
   chain: mainnet,
   transport: http(process.env.ETH_RPC_URL || 'https://eth.llamarpc.com'),
 })
+
+// ENS contracts on mainnet
+const ENS_REGISTRY = '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e' as const
+const PUBLIC_RESOLVER = '0x231b0Ee14048e9dCcD1d247744d114a4EB5E8E63' as const
 
 const resolverAbi = [
   {
@@ -25,6 +29,30 @@ const resolverAbi = [
     stateMutability: 'nonpayable',
     inputs: [{ name: 'data', type: 'bytes[]' }],
     outputs: [{ name: 'results', type: 'bytes[]' }],
+  },
+] as const
+
+// ENS Registry ABI for subdomain creation
+const registryAbi = [
+  {
+    name: 'setSubnodeRecord',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'node', type: 'bytes32' },
+      { name: 'label', type: 'bytes32' },
+      { name: 'owner', type: 'address' },
+      { name: 'resolver', type: 'address' },
+      { name: 'ttl', type: 'uint64' },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'owner',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'node', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
   },
 ] as const
 
@@ -387,4 +415,139 @@ export async function getInvoiceFromENS(
 export function verifyInvoice(invoice: InvoiceData, storedHash: string): boolean {
   const computedHash = computeInvoiceHash(invoice)
   return computedHash === storedHash
+}
+
+/**
+ * Build transaction to create an invoice subdomain.
+ * Creates: inv-{id}.yourname.eth with invoice data in text records.
+ *
+ * This demonstrates deeper ENS integration by creating actual subdomains
+ * rather than just storing data in text records on the parent name.
+ */
+export async function buildCreateInvoiceSubdomainTransaction(
+  ensName: string,
+  invoice: InvoiceData,
+  ownerAddress: string,
+): Promise<{
+  transactions: Array<{ to: string; data: string; value: string; chainId: number; description: string }>
+  subdomain: string
+  invoiceHash: string
+}> {
+  const normalized = normalize(ensName)
+  const parentNode = namehash(normalized)
+
+  // Create subdomain label: inv-{id}
+  const subdomainLabel = `inv-${invoice.id}`
+  const subdomain = `${subdomainLabel}.${normalized}`
+  const subdomainNode = namehash(subdomain)
+  const label = labelhash(subdomainLabel)
+
+  const invoiceHash = computeInvoiceHash(invoice)
+
+  // Transaction 1: Create subdomain via ENS Registry
+  const createSubdomainData = encodeFunctionData({
+    abi: registryAbi,
+    functionName: 'setSubnodeRecord',
+    args: [
+      parentNode,
+      label,
+      ownerAddress as `0x${string}`,
+      PUBLIC_RESOLVER,
+      BigInt(0), // TTL
+    ],
+  })
+
+  // Transaction 2: Set invoice data on subdomain resolver
+  // Compact format: hash:amount:token:memo
+  const invoiceValue = [
+    invoiceHash,
+    invoice.amount,
+    invoice.token,
+    invoice.memo || '',
+    invoice.expiresAt || '',
+  ].join(':')
+
+  const setTextData = encodeFunctionData({
+    abi: resolverAbi,
+    functionName: 'setText',
+    args: [subdomainNode, 'flowfi.invoice', invoiceValue],
+  })
+
+  return {
+    transactions: [
+      {
+        to: ENS_REGISTRY,
+        data: createSubdomainData,
+        value: '0',
+        chainId: 1,
+        description: `Create subdomain: ${subdomain}`,
+      },
+      {
+        to: PUBLIC_RESOLVER,
+        data: setTextData,
+        value: '0',
+        chainId: 1,
+        description: `Set invoice data on ${subdomain}`,
+      },
+    ],
+    subdomain,
+    invoiceHash,
+  }
+}
+
+/**
+ * Read invoice data from a subdomain.
+ * Reads from: inv-{id}.yourname.eth
+ */
+export async function getInvoiceFromSubdomain(
+  ensName: string,
+  invoiceId: string,
+): Promise<{
+  hash: string
+  amount: string
+  token: string
+  memo?: string
+  expiresAt?: string
+  subdomain: string
+} | null> {
+  try {
+    const normalized = normalize(ensName)
+    const subdomain = `inv-${invoiceId}.${normalized}`
+
+    const value = await client.getEnsText({ name: subdomain, key: 'flowfi.invoice' })
+    if (!value) return null
+
+    // Parse compact format: hash:amount:token:memo:expiresAt
+    const [hash, amount, token, memo, expiresAt] = value.split(':')
+    if (!hash || !amount || !token) return null
+
+    return {
+      hash,
+      amount,
+      token,
+      memo: memo || undefined,
+      expiresAt: expiresAt || undefined,
+      subdomain,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Check if a subdomain exists by querying its owner.
+ */
+export async function subdomainExists(subdomain: string): Promise<boolean> {
+  try {
+    const node = namehash(normalize(subdomain))
+    const owner = await client.readContract({
+      address: ENS_REGISTRY,
+      abi: registryAbi,
+      functionName: 'owner',
+      args: [node],
+    })
+    return owner !== '0x0000000000000000000000000000000000000000'
+  } catch {
+    return false
+  }
 }

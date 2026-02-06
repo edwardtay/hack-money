@@ -9,12 +9,25 @@
  */
 
 import { NextResponse } from 'next/server'
-import { createPublicClient, http, formatEther, parseEther, type Address } from 'viem'
+import {
+  createPublicClient,
+  createWalletClient,
+  encodeFunctionData,
+  http,
+  formatEther,
+  parseEther,
+  parseUnits,
+  type Address,
+} from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
 import { base, mainnet, arbitrum, optimism } from 'viem/chains'
 import { createConfig, getQuote } from '@lifi/sdk'
 
 // Initialize LI.FI SDK
 createConfig({ integrator: 'flowfi-agent' })
+
+// Agent wallet (for executing transactions)
+const AGENT_PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY as `0x${string}` | undefined
 
 // GasTankRegistry on Base
 const GAS_TANK_REGISTRY = '0xB3ce7C226BF75B470B916C2385bB5FF714c3D757' as Address
@@ -474,6 +487,182 @@ export async function GET(request: Request) {
         },
       },
     })
+  }
+
+  // Execute a real swap (for demo purposes - proves agent can execute)
+  if (action === 'execute') {
+    if (!AGENT_PRIVATE_KEY) {
+      return NextResponse.json(
+        { error: 'Agent wallet not configured (AGENT_PRIVATE_KEY missing)' },
+        { status: 500 }
+      )
+    }
+
+    try {
+      const account = privateKeyToAccount(AGENT_PRIVATE_KEY)
+      const agentAddress = account.address
+
+      // Small swap: 0.1 USDC -> USDT on Base (demonstrates real execution)
+      const swapAmount = parseUnits('0.1', 6) // 0.1 USDC
+
+      // Get LI.FI quote for Base swap (includes transactionRequest)
+      const quote = await getQuote({
+        fromChain: 8453, // Base
+        toChain: 8453, // Base
+        fromToken: TOKENS.USDC_BASE,
+        toToken: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2', // USDT on Base
+        fromAmount: swapAmount.toString(),
+        fromAddress: agentAddress,
+        toAddress: agentAddress,
+        slippage: 0.01, // 1%
+      })
+
+      if (!quote || !quote.transactionRequest) {
+        return NextResponse.json(
+          { error: 'No quote or transaction data from LI.FI' },
+          { status: 400 }
+        )
+      }
+
+      const toolName = quote.toolDetails?.name || 'LI.FI'
+      const estimatedOutput = quote.estimate?.toAmount
+
+      log({
+        type: 'lifi_bridge',
+        receiver: agentAddress,
+        details: {
+          action: 'execute_swap',
+          fromToken: 'USDC',
+          toToken: 'USDT',
+          amount: '0.5',
+          quote: {
+            tool: toolName,
+            estimatedOutput,
+          },
+        },
+      })
+
+      const txRequest = quote.transactionRequest
+      const lifiDiamond = txRequest.to as Address
+
+      // Create wallet client for execution
+      const walletClient = createWalletClient({
+        account,
+        chain: base,
+        transport: http(),
+      })
+
+      // ERC20 approve ABI
+      const approveAbi = [
+        {
+          name: 'approve',
+          type: 'function',
+          inputs: [
+            { name: 'spender', type: 'address' },
+            { name: 'amount', type: 'uint256' },
+          ],
+          outputs: [{ name: '', type: 'bool' }],
+          stateMutability: 'nonpayable',
+        },
+      ] as const
+
+      // Step 1: Approve USDC to LI.FI Diamond
+      let approvalHash: string | undefined
+      try {
+        const approveData = encodeFunctionData({
+          abi: approveAbi,
+          functionName: 'approve',
+          args: [lifiDiamond, swapAmount],
+        })
+
+        approvalHash = await walletClient.sendTransaction({
+          to: TOKENS.USDC_BASE as Address,
+          data: approveData,
+        })
+
+        // Wait for approval to confirm
+        const publicClient = createPublicClient({ chain: base, transport: http() })
+        await publicClient.waitForTransactionReceipt({ hash: approvalHash })
+
+        log({
+          type: 'lifi_bridge',
+          receiver: agentAddress,
+          details: {
+            action: 'approval_confirmed',
+            token: 'USDC',
+            spender: lifiDiamond,
+            txHash: approvalHash,
+          },
+        })
+      } catch (e) {
+        return NextResponse.json({
+          success: false,
+          error: 'Approval failed',
+          details: e instanceof Error ? e.message : String(e),
+        }, { status: 500 })
+      }
+
+      // Step 2: Execute the swap
+      let txHash: string | undefined
+      let executionError: string | undefined
+
+      try {
+        txHash = await walletClient.sendTransaction({
+          to: lifiDiamond,
+          data: txRequest.data as `0x${string}`,
+          value: BigInt(txRequest.value || '0'),
+          gas: txRequest.gasLimit ? BigInt(txRequest.gasLimit) : undefined,
+        })
+      } catch (e) {
+        executionError = e instanceof Error ? e.message : String(e)
+      }
+
+      log({
+        type: 'lifi_bridge',
+        receiver: agentAddress,
+        details: {
+          action: txHash ? 'swap_executed' : 'swap_failed',
+          txHash: txHash || 'failed',
+          error: executionError,
+        },
+      })
+
+      return NextResponse.json({
+        success: !!txHash,
+        execution: {
+          agent: agentAddress,
+          action: 'USDC → USDT swap on Base',
+          amount: '0.1 USDC',
+          tool: toolName,
+          txHash: txHash || null,
+          explorerUrl: txHash ? `https://basescan.org/tx/${txHash}` : null,
+          timestamp: new Date().toISOString(),
+          error: executionError,
+        },
+        proof: {
+          lifiIntegration: true,
+          realExecution: !!txHash,
+          agentAutomated: true,
+        },
+      })
+    } catch (error) {
+      log({
+        type: 'error',
+        receiver: 'agent',
+        details: {
+          action: 'execute_failed',
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+
+      return NextResponse.json(
+        {
+          error: 'Execution failed',
+          details: error instanceof Error ? error.message : String(error),
+        },
+        { status: 500 }
+      )
+    }
   }
 
   // Run the agent cycle (called by cron)
