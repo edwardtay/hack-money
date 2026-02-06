@@ -18,6 +18,7 @@ import {
   parseEther,
   parseUnits,
   type Address,
+  type Chain,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { base, mainnet, arbitrum, optimism } from 'viem/chains'
@@ -455,13 +456,13 @@ export async function GET(request: Request) {
       if (intent.action === 'pay' && intent.recipient && intent.amount) {
         // Build a payment via LI.FI
         const swapIntent: ParsedIntent = {
-          action: 'swap',
+          action: 'transfer',
           fromToken: intent.token || 'USDC',
           toToken: 'USDC',
           amount: intent.amount,
           fromChain: intent.fromChain || 'base',
           toChain: intent.toChain || 'base',
-          recipient: intent.recipient,
+          toAddress: intent.recipient,
         }
 
         executionPlan = {
@@ -1494,7 +1495,7 @@ export async function POST(request: Request) {
           }
 
           // Get the correct chain for execution
-          const chainMap: Record<string, typeof base> = {
+          const chainMap: Record<string, Chain> = {
             base,
             mainnet,
             arbitrum,

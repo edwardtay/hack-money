@@ -21,14 +21,6 @@ import {
 } from './tokens'
 import { V4_CHAINS, getPairDefaults } from './v4-router'
 
-// CCTP supported chains (for reference - CCTP path disabled for now)
-const CIRCLE_CHAIN_IDS: Record<string, number> = {
-  ethereum: 1,
-  arbitrum: 42161,
-  base: 8453,
-  optimism: 10,
-}
-
 // Ensure LI.FI SDK is configured
 createConfig({ integrator: 'payagent' })
 
@@ -401,12 +393,9 @@ function resolveParams(intent: ParsedIntent) {
  * Given a parsed intent and the user's wallet address, fetches transaction
  * data ready for signing.
  *
- * If the intent is a cross-chain USDC transfer eligible for Circle CCTP,
- * the Circle Bridge Kit path is used. Otherwise LI.FI is the fallback.
- *
- * An optional `provider` hint can force a specific execution path:
- *   - "Circle CCTP" -> always use the CCTP bridge
- *   - anything else  -> use LI.FI
+ * Routes:
+ *   - "Uniswap v4" -> Uniswap v4 + PayAgent Hook (same-chain swaps on Base)
+ *   - Default -> LI.FI (cross-chain and multi-DEX routing)
  */
 export async function getTransactionData(
   intent: ParsedIntent,
@@ -422,123 +411,13 @@ export async function getTransactionData(
   }
 
   // ------------------------------------------------------------------
-  // Circle CCTP path
-  // ------------------------------------------------------------------
-  if (provider === 'Circle CCTP' || await shouldUseCCTP(intent)) {
-    return getCCTPTransactionData(intent, fromAddress)
-  }
-
-  // ------------------------------------------------------------------
-  // Default: LI.FI path
+  // Default: LI.FI path (handles cross-chain, swaps, bridges)
   // ------------------------------------------------------------------
   return getLiFiTransactionData(intent, fromAddress, slippage)
 }
 
 // ---------------------------------------------------------------------------
-// Circle CCTP execution
-// ---------------------------------------------------------------------------
-
-/**
- * Determine if an intent should be routed through Circle CCTP.
- * CCTP path is disabled - using LI.FI for all cross-chain routing.
- */
-async function shouldUseCCTP(_intent: ParsedIntent): Promise<boolean> {
-  // CCTP path disabled for hackathon - LI.FI handles cross-chain routing
-  return false
-}
-
-/**
- * Build transaction data for a Circle CCTP bridge transfer.
- *
- * In production this would call the Bridge Kit SDK to get the exact
- * calldata for the CCTP MessageTransmitter contract. For now we return
- * the essential fields so the frontend can construct the transaction.
- */
-async function getCCTPTransactionData(
-  intent: ParsedIntent,
-  fromAddress: string
-): Promise<TransactionData> {
-  const fromChain = intent.fromChain?.toLowerCase() ?? 'ethereum'
-  const toChain = intent.toChain?.toLowerCase() ?? 'ethereum'
-
-  const fromChainId = CHAIN_MAP[fromChain] || CHAIN_MAP.ethereum
-  const fromTokenAddr = getTokenAddress('USDC', fromChainId)
-
-  if (!fromTokenAddr) {
-    throw new Error(`USDC not available on ${fromChain}`)
-  }
-
-  const decimals = getTokenDecimals('USDC')
-  const amountWei = BigInt(
-    Math.floor(parseFloat(intent.amount) * 10 ** decimals)
-  ).toString()
-
-  // CCTP V2 TokenMessenger contract addresses per chain
-  const TOKEN_MESSENGER: Record<string, string> = {
-    ethereum: '0xBd3fa81B58Ba92a82136038B25aDec7066af3155',
-    arbitrum: '0x19330d10D9Cc8751218eaf51E8885D058642E08A',
-    base: '0x1682Ae6375C4E4A97e4B583BC394c861A46D8962',
-    optimism: '0x2B4069517957735bE00ceE0fadAE88a26365528f',
-  }
-
-  // CCTP V2 destination domain identifiers
-  const CCTP_DOMAINS: Record<string, number> = {
-    ethereum: 0,
-    arbitrum: 3,
-    base: 6,
-    optimism: 2,
-  }
-
-  const tokenMessenger = TOKEN_MESSENGER[fromChain]
-  if (!tokenMessenger) {
-    throw new Error(`No CCTP TokenMessenger for chain: ${fromChain}`)
-  }
-
-  const destinationDomain = CCTP_DOMAINS[toChain]
-  if (destinationDomain === undefined) {
-    throw new Error(`No CCTP domain for destination chain: ${toChain}`)
-  }
-
-  // Encode the depositForBurn call
-  // depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken)
-  const { encodeFunctionData } = await import('viem')
-  const calldata = encodeFunctionData({
-    abi: [
-      {
-        name: 'depositForBurn',
-        type: 'function',
-        stateMutability: 'nonpayable',
-        inputs: [
-          { name: 'amount', type: 'uint256' },
-          { name: 'destinationDomain', type: 'uint32' },
-          { name: 'mintRecipient', type: 'bytes32' },
-          { name: 'burnToken', type: 'address' },
-        ],
-        outputs: [{ name: 'nonce', type: 'uint64' }],
-      },
-    ],
-    functionName: 'depositForBurn',
-    args: [
-      BigInt(amountWei),
-      destinationDomain,
-      // Pad the recipient address to bytes32
-      `0x000000000000000000000000${(intent.toAddress || fromAddress).slice(2)}` as `0x${string}`,
-      fromTokenAddr as `0x${string}`,
-    ],
-  })
-
-  return {
-    to: tokenMessenger,
-    data: calldata,
-    value: '0',
-    chainId: fromChainId,
-    provider: 'Circle CCTP',
-    routeType: 'standard',
-  }
-}
-
-// ---------------------------------------------------------------------------
-// LI.FI execution (original path)
+// LI.FI execution
 // ---------------------------------------------------------------------------
 
 /**

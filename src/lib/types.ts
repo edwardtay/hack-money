@@ -7,7 +7,7 @@ export type RouteOption = {
   path: string         // e.g. "Base USDC -> Arbitrum USDC"
   fee: string          // e.g. "$0.12"
   estimatedTime: string
-  provider: string     // e.g. "LI.FI", "Circle CCTP", "Uniswap v4"
+  provider: string     // e.g. "LI.FI", "Uniswap v4"
   routeType?: RouteType // categorise route for frontend display
 }
 
