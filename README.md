@@ -73,6 +73,30 @@ Your DeFi preferences are stored in ENS text records:
 |----------|---------|
 | YieldRouter | `0xE132329262224f5EEd5BCA1ee64768cf437308d8` |
 | RestakingRouter | `0x31549dB00B180d528f77083b130C0A045D0CF117` |
+| PayAgentHook | `0xA5Cb63B540D4334F01346F3D4C51d5B2fFf050c0` |
+| PoolManager | `0x498581fF718922c3f8e6A244956aF099B2652b2b` |
+
+## Uniswap v4 Integration
+
+FlowFi uses a custom Uniswap v4 hook (`PayAgentHook`) for on-chain dynamic fees.
+
+**Example Swap Transaction:**
+- TX: [0x37fe2ada...0b005f7d](https://basescan.org/tx/0x37fe2adaa33bf41b8c1969dd124ed7672c001c5f06791e58dda50cff0b005f7d)
+- Pool ID: `0xa0d5acc69bb086910e2483f8fc8d6c850bfe0a0240ba280f651984ec2821d169`
+- Hook events visible in tx logs:
+  - `SwapProcessed` — tracks swap count per pool
+  - `VolumeUpdated` — tracks actual volume from BalanceDelta
+
+**Pool Stats (live on-chain):**
+- Swap count: 15
+- Total volume: ~70 USDC
+- Fee: 0.01% (dynamic, admin-configurable)
+
+**Hook Features:**
+- Per-pool admin control (set on initialization)
+- Pluggable `IFeeStrategy` for custom fee logic
+- Timelock on fee changes (150 blocks / ~5 min)
+- Max fee capped at 1% to prevent extraction
 
 ## Getting Started
 
