@@ -11,6 +11,7 @@ import { getStrategy, parseStrategyAllocation, type StrategyAllocation } from '@
 import { calculateFee, getNextTierInfo, YIELD_SHARE_RATE } from '@/lib/incentives/fee-tiers'
 import { getVolumeRecord } from '@/lib/incentives/volume-tracker'
 import { isInternalPayment, getNetworkStats } from '@/lib/incentives/network-effects'
+import { calculateReferralReward, getReferrer } from '@/lib/incentives/referrals'
 
 // Stablecoins that should prefer Uniswap v4 for same-chain swaps
 const STABLECOINS = new Set(['USDC', 'USDT', 'DAI', 'FRAX', 'LUSD', 'TUSD', 'BUSD'])
@@ -318,6 +319,9 @@ export async function POST(req: NextRequest) {
     const tierInfo = getNextTierInfo(volumeRecord.monthlyVolumeUsd)
     const networkStats = getNetworkStats()
 
+    // Calculate referral reward (if receiver was referred)
+    const referralInfo = calculateReferralReward(toAddress, feeInfo.feeAmount)
+
     return NextResponse.json({
       routes: allRoutes,
       resolvedAddress,
@@ -342,6 +346,9 @@ export async function POST(req: NextRequest) {
         percentToNextTier: tierInfo.percentToNextTier.toFixed(0),
         // Yield share info
         yieldShareRate: ensStrategy === 'yield' ? `${YIELD_SHARE_RATE * 100}%` : null,
+        // Referral info (if receiver was referred, someone earns from this payment)
+        referrer: referralInfo.referrer,
+        referralReward: referralInfo.referrer ? referralInfo.referralReward.toFixed(2) : null,
       },
     })
   } catch (error: unknown) {
