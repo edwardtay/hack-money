@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAccount, useSendTransaction, useSwitchChain } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { Button } from '@/components/ui/button'
@@ -350,6 +350,17 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
     memo,
   ])
 
+  // Poll for gasless payment status
+  useEffect(() => {
+    if (gaslessPayment.status !== 'pending' || !gaslessPayment.taskId) return
+
+    const pollStatus = setInterval(async () => {
+      await gaslessPayment.checkStatus()
+    }, 3000)
+
+    return () => clearInterval(pollStatus)
+  }, [gaslessPayment.status, gaslessPayment.taskId, gaslessPayment.checkStatus])
+
   // Execute gasless payment
   const handleGaslessExecute = useCallback(async () => {
     if (!address || !recipientInfo?.address || !amount) return
@@ -358,23 +369,19 @@ export function PaymentFlow({ ensName, prefilledAmount, prefilledToken }: Props)
       // Convert amount to USDC decimals (6)
       const amountInDecimals = BigInt(Math.floor(parseFloat(amount) * 1_000_000))
 
+      // Only pass vault if yield route is enabled
+      const vaultAddress = useYieldRoute && yieldVault ? yieldVault as Address : undefined
+
       await gaslessPayment.execute({
         recipient: recipientInfo.address as Address,
         amount: amountInDecimals,
-        vault: yieldVault as Address | undefined,
+        vault: vaultAddress,
       })
-
-      // Poll for status
-      const pollStatus = setInterval(async () => {
-        await gaslessPayment.checkStatus()
-        if (gaslessPayment.status === 'success' || gaslessPayment.status === 'error') {
-          clearInterval(pollStatus)
-        }
-      }, 3000)
     } catch (e) {
       console.error('Gasless payment failed:', e)
+      // Error is already set in the hook, will display in UI
     }
-  }, [address, recipientInfo?.address, amount, yieldVault, gaslessPayment])
+  }, [address, recipientInfo?.address, amount, yieldVault, useYieldRoute, gaslessPayment])
 
   if (loading) {
     return (
