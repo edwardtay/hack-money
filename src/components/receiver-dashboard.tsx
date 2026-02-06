@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAccount, useSendTransaction, useSwitchChain } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { QRCodeSVG } from 'qrcode.react'
@@ -9,6 +9,46 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useGasTank } from '@/hooks/use-gas-tank'
 import { useClientEnsPreferences } from '@/hooks/use-client-ens'
 import { InvoiceModal } from '@/components/invoice-modal'
+
+// AI Agent simulation result type
+type AgentSimulation = {
+  success: boolean
+  simulation: {
+    scenario: string
+    steps: Array<{
+      step: number
+      action: string
+      provider: string
+      status: string
+    }>
+    integrations: {
+      lifi: { used: boolean; realQuote: boolean; purpose: string }
+      uniswapV4: { used: boolean; hook: string; poolId: string; purpose: string }
+    }
+  }
+}
+
+function useAgentStatus() {
+  const [simulation, setSimulation] = useState<AgentSimulation | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [lastRun, setLastRun] = useState<Date | null>(null)
+
+  const runSimulation = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/agent/cron?action=simulate')
+      const data = await res.json()
+      setSimulation(data)
+      setLastRun(new Date())
+    } catch {
+      setSimulation(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { simulation, loading, lastRun, runSimulation }
+}
 
 // Vault options
 const VAULT_OPTIONS = [
@@ -103,6 +143,7 @@ export function ReceiverDashboard() {
   const { receipts, loading: receiptsLoading } = useReceipts(address)
   const { position: vaultPosition, loading: positionLoading } = useVaultPosition(currentVault ?? undefined, address)
   const gasTank = useGasTank()
+  const agent = useAgentStatus()
 
   const [showSettings, setShowSettings] = useState(false)
   const [depositAmount, setDepositAmount] = useState('0.005')
@@ -390,6 +431,88 @@ export function ReceiverDashboard() {
               Gas tank empty - add funds to enable gasless payments
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* AI Agent Status */}
+      <Card className="border-[#E4E2DC] bg-white">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-[#F0F9FF] flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-[#0EA5E9]">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2v2h-2v-2zm1-10c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z" fill="currentColor"/>
+                </svg>
+              </div>
+              <h2 className="font-semibold text-[#1C1B18]">AI Agent</h2>
+            </div>
+            {agent.lastRun && (
+              <span className="text-xs text-[#6B6960]">
+                Last run: {agent.lastRun.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+
+          {agent.simulation?.success ? (
+            <div className="space-y-3">
+              {/* Steps */}
+              <div className="space-y-2">
+                {agent.simulation.simulation.steps.map((step) => (
+                  <div key={step.step} className="flex items-center gap-2 text-sm">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
+                      step.status === 'quote_ready' ? 'bg-[#EDF5F0] text-[#22C55E]' :
+                      step.status === 'simulated' ? 'bg-[#F0F9FF] text-[#0EA5E9]' :
+                      'bg-[#FFF3E0] text-[#E65100]'
+                    }`}>
+                      {step.status === 'quote_ready' ? '✓' : step.status === 'simulated' ? '~' : '!'}
+                    </div>
+                    <span className="text-[#1C1B18]">{step.action}</span>
+                    <span className="text-[#9C9B93] text-xs">({step.provider})</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Integrations */}
+              <div className="flex gap-2 pt-2 border-t border-[#E4E2DC]">
+                {agent.simulation.simulation.integrations.lifi.realQuote && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#EDF5F0] text-[#22C55E] text-xs font-medium">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                      <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    LI.FI Quote
+                  </span>
+                )}
+                {agent.simulation.simulation.integrations.uniswapV4.used && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#FDF2F8] text-[#EC4899] text-xs font-medium">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                      <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Uniswap v4
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-[#6B6960]">
+              Run a simulation to see how the AI agent handles gas tank refills.
+            </p>
+          )}
+
+          <Button
+            onClick={agent.runSimulation}
+            disabled={agent.loading}
+            variant="outline"
+            className="w-full mt-3 border-[#E4E2DC]"
+          >
+            {agent.loading ? (
+              <span className="flex items-center gap-2">
+                <span className="animate-spin w-4 h-4 border-2 border-[#1C1B18] border-t-transparent rounded-full" />
+                Running...
+              </span>
+            ) : (
+              'Run Simulation'
+            )}
+          </Button>
         </CardContent>
       </Card>
 
