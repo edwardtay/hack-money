@@ -8,6 +8,8 @@ import { getMultiVaultRouteQuote, isMultiVaultRoute } from '@/lib/routing/multi-
 import { getTokenAddress, getPreferredChainForToken, CHAIN_MAP, CHAIN_ID_TO_NAME } from '@/lib/routing/tokens'
 import { isRateLimited } from '@/lib/rate-limit'
 import { getStrategy, parseStrategyAllocation, type StrategyAllocation } from '@/lib/strategies'
+import { calculateFee, getNextTierInfo, YIELD_SHARE_RATE } from '@/lib/incentives/fee-tiers'
+import { getVolumeRecord } from '@/lib/incentives/volume-tracker'
 
 // Stablecoins that should prefer Uniswap v4 for same-chain swaps
 const STABLECOINS = new Set(['USDC', 'USDT', 'DAI', 'FRAX', 'LUSD', 'TUSD', 'BUSD'])
@@ -299,6 +301,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Calculate fee tier for receiver
+    const amountNum = parseFloat(amount) || 0
+    const volumeRecord = getVolumeRecord(toAddress)
+    const feeInfo = calculateFee({
+      amountUsd: amountNum,
+      monthlyVolumeUsd: volumeRecord.monthlyVolumeUsd,
+      receiverHasGasTank: false, // TODO: check GasTankRegistry
+    })
+    const tierInfo = getNextTierInfo(volumeRecord.monthlyVolumeUsd)
+
     return NextResponse.json({
       routes: allRoutes,
       resolvedAddress,
@@ -310,6 +322,20 @@ export async function POST(req: NextRequest) {
       // Multi-strategy allocation info
       strategyAllocations: strategyAllocations.length > 1 ? strategyAllocations : undefined,
       isMultiStrategy: strategyAllocations.length > 1,
+      // Fee tier info (incentive system)
+      feeTier: {
+        tier: feeInfo.tier.name,
+        feePercent: feeInfo.feePercent,
+        feeAmount: feeInfo.feeAmount.toFixed(2),
+        reason: feeInfo.reason,
+        monthlyVolume: volumeRecord.monthlyVolumeUsd,
+        // Progress to next tier
+        nextTier: tierInfo.nextTier?.name || null,
+        volumeToNextTier: tierInfo.volumeToNextTier,
+        percentToNextTier: tierInfo.percentToNextTier.toFixed(0),
+        // Yield share info
+        yieldShareRate: ensStrategy === 'yield' ? `${YIELD_SHARE_RATE * 100}%` : null,
+      },
     })
   } catch (error: unknown) {
     console.error('Quote API error:', error)

@@ -87,6 +87,15 @@ export function PaymentFlow({ ensName, prefilledAmount, invoiceId, invoiceMemo }
   const [yieldVault, setYieldVault] = useState<string | null>(null)
   const [useYieldRoute, setUseYieldRoute] = useState(false)
   const [useV4Route, setUseV4Route] = useState(false)
+  // Fee tier info from incentive system
+  const [feeTier, setFeeTier] = useState<{
+    tier: string
+    feePercent: string
+    nextTier: string | null
+    volumeToNextTier: number
+    percentToNextTier: string
+    yieldShareRate: string | null
+  } | null>(null)
   const [executing, setExecuting] = useState(false)
   const [txHash, setTxHash] = useState<string | null>(null)
   const [executedProvider, setExecutedProvider] = useState<string | null>(null)
@@ -162,6 +171,10 @@ export function PaymentFlow({ ensName, prefilledAmount, invoiceId, invoiceMemo }
           setYieldVault(data.yieldVault || null)
           setUseYieldRoute(data.useYieldRoute || false)
           setUseV4Route(data.useV4Route || false)
+          // Set fee tier info from incentive system
+          if (data.feeTier) {
+            setFeeTier(data.feeTier)
+          }
         }
       } catch {}
     }, 500)
@@ -431,7 +444,7 @@ export function PaymentFlow({ ensName, prefilledAmount, invoiceId, invoiceMemo }
             <p className="text-sm text-[#6B6960]">Finding your balances...</p>
           )}
 
-          {/* Fee disclosure */}
+          {/* Fee disclosure with tier info */}
           {quote && amount && parseFloat(amount) > 0 && (
             <div className="rounded-lg bg-[#F8F7F4] p-3 space-y-2">
               <div className="flex items-center justify-between text-sm">
@@ -444,12 +457,41 @@ export function PaymentFlow({ ensName, prefilledAmount, invoiceId, invoiceMemo }
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[#6B6960]">Protocol fee</span>
-                <span className="text-[#1C1B18]">0.1%</span>
+                <span className="text-[#1C1B18]">
+                  {feeTier?.feePercent || '0.1%'}
+                  {feeTier?.tier && feeTier.tier !== 'Starter' && (
+                    <span className="ml-1 text-xs text-[#22C55E]">({feeTier.tier})</span>
+                  )}
+                </span>
               </div>
               <div className="border-t border-[#E4E2DC] pt-2 flex items-center justify-between text-sm">
                 <span className="text-[#6B6960]">{ensName} receives</span>
-                <span className="text-[#22C55E] font-semibold">~{(parseFloat(amount) * 0.999).toFixed(2)} USDC</span>
+                <span className="text-[#22C55E] font-semibold">
+                  ~{(parseFloat(amount) * (1 - (parseFloat(feeTier?.feePercent || '0.1') / 100))).toFixed(2)} USDC
+                </span>
               </div>
+              {/* Tier progress */}
+              {feeTier?.nextTier && (
+                <div className="pt-1">
+                  <div className="flex items-center justify-between text-xs text-[#9C9B93]">
+                    <span>{feeTier.tier} tier</span>
+                    <span>${feeTier.volumeToNextTier?.toLocaleString()} to {feeTier.nextTier}</span>
+                  </div>
+                  <div className="mt-1 h-1 bg-[#E4E2DC] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#22C55E] rounded-full transition-all"
+                      style={{ width: `${feeTier.percentToNextTier}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {/* Yield share info */}
+              {feeTier?.yieldShareRate && useYieldRoute && (
+                <div className="flex items-center justify-between text-xs text-[#6B6960]">
+                  <span>Yield share (protocol)</span>
+                  <span className="text-[#1C1B18]">{feeTier.yieldShareRate} of earnings</span>
+                </div>
+              )}
               {useYieldRoute && (
                 <div className="flex items-center justify-between text-xs text-[#6B6960]">
                   <span>Auto-deposited to</span>
