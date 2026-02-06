@@ -68,15 +68,32 @@ const DECISION_PROMPT = `You are FlowFi's autonomous agent. Analyze the situatio
 
 Context:
 - You manage gas tanks for receivers (so their payers don't pay gas)
-- You can execute swaps, bridges, and payments
-- You should act when: gas tanks are low, scheduled payments are due, or yield opportunities exist
-- You should NOT act when: balances are healthy, no pending tasks, or action would be wasteful
+- You can execute swaps, bridges, and payments via Uniswap v4 + LI.FI
+- You monitor the PayAgentHook on Uniswap v4 for pool activity
+
+When to ACT:
+- Gas tanks are low AND funds available to refill
+- Scheduled payments are due
+- V4 pool shows high activity (many swaps) → good time to batch operations
+- V4 pool shows low activity but healthy volume → maintain liquidity
+
+When NOT to ACT:
+- Balances are healthy, no pending tasks
+- V4 pool fee is elevated (wait for lower fees)
+- Action would be wasteful (gas > value)
+
+V4 Pool Insights (use this data):
+- swapCount: Total number of swaps through the hook
+- totalVolumeUsd: Total USD volume processed
+- isActive: Whether the pool has recent activity
+- If swapCount > 10 and volumeUsd > 50, the pool is proven and safe to use
+- If swapCount is low, mention that we should route through the pool to increase activity
 
 Respond with JSON:
 {
   "shouldAct": true/false,
   "action": { ...PaymentIntent if shouldAct },
-  "reasoning": "why you decided this"
+  "reasoning": "why you decided this, referencing V4 pool data if relevant"
 }`
 
 async function callGroq(messages: { role: string; content: string }[]): Promise<string> {
@@ -197,12 +214,27 @@ export async function makeDecision(situation: {
   gasTanks: { receiver: string; balance: string; threshold: string }[]
   pendingPayments: { to: string; amount: string; dueAt: string }[]
   marketConditions?: { gasPrice: string; ethPrice: string }
+  v4PoolStats?: {
+    swapCount: string
+    totalVolumeUsd: string
+    isActive: boolean
+    poolId: string
+  }
 }): Promise<AgentDecision> {
+  const v4Stats = situation.v4PoolStats
+    ? `
+- V4 Pool Stats (PayAgentHook):
+  - Pool ID: ${situation.v4PoolStats.poolId}
+  - Total Swaps: ${situation.v4PoolStats.swapCount}
+  - Total Volume: $${situation.v4PoolStats.totalVolumeUsd}
+  - Pool Active: ${situation.v4PoolStats.isActive}`
+    : ''
+
   const situationText = `
 Current situation:
 - Gas tanks: ${JSON.stringify(situation.gasTanks)}
 - Pending payments: ${JSON.stringify(situation.pendingPayments)}
-- Market: ${JSON.stringify(situation.marketConditions || { gasPrice: 'normal', ethPrice: 'stable' })}
+- Market: ${JSON.stringify(situation.marketConditions || { gasPrice: 'normal', ethPrice: 'stable' })}${v4Stats}
 
 Should I take any action?`
 
