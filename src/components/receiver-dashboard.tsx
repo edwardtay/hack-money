@@ -6,7 +6,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { useGasTank } from '@/hooks/use-gas-tank'
 
 // Vault options
 const VAULT_OPTIONS = [
@@ -123,8 +123,10 @@ export function ReceiverDashboard() {
   const { vault: currentVault, strategy: currentStrategy, avatar: ensAvatar, loading: prefsLoading } = useEnsPreferences(ensName)
   const { receipts, loading: receiptsLoading } = useReceipts(address)
   const { position: vaultPosition, loading: positionLoading } = useVaultPosition(currentVault ?? undefined, address)
+  const gasTank = useGasTank()
 
   const [showSettings, setShowSettings] = useState(false)
+  const [depositAmount, setDepositAmount] = useState('0.005')
   const [selectedVaultId, setSelectedVaultId] = useState<string>('')
   const [selectedStrategy, setSelectedStrategy] = useState<string>('yield')
   const [saving, setSaving] = useState(false)
@@ -132,7 +134,6 @@ export function ReceiverDashboard() {
   const [saveTxHash, setSaveTxHash] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const [requestAmount, setRequestAmount] = useState('')
 
   // Sync with current preferences
   useEffect(() => {
@@ -190,8 +191,7 @@ export function ReceiverDashboard() {
   }
 
   const handleCopy = () => {
-    const base = `${window.location.origin}/pay/${ensName}`
-    navigator.clipboard.writeText(requestAmount ? `${base}?amount=${requestAmount}` : base)
+    navigator.clipboard.writeText(`${window.location.origin}/pay/${ensName}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -254,8 +254,7 @@ export function ReceiverDashboard() {
     )
   }
 
-  const basePaymentLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/pay/${ensName}`
-  const paymentLink = requestAmount ? `${basePaymentLink}?amount=${requestAmount}` : basePaymentLink
+  const paymentLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/pay/${ensName}`
   const strategyLabel = currentStrategy === 'restaking' ? 'Renzo' : currentStrategy === 'liquid' ? 'Liquid' : 'Aave'
 
   return (
@@ -339,6 +338,60 @@ export function ReceiverDashboard() {
           {(currentVault || currentStrategy) && (
             <p className="text-xs text-[#6B6960] mt-3 pt-3 border-t border-[#E4E2DC]">
               Earning via {strategyLabel} · {vaultPosition?.apy ?? '~4'}% APY
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Gas Tank Card */}
+      <Card className="border-[#E4E2DC] bg-white">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                gasTank.status?.estimatedPayments && gasTank.status.estimatedPayments > 20
+                  ? 'bg-[#EDF5F0]'
+                  : 'bg-[#FFF3E0]'
+              }`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className={
+                  gasTank.status?.estimatedPayments && gasTank.status.estimatedPayments > 20
+                    ? 'text-[#22C55E]'
+                    : 'text-[#E65100]'
+                }>
+                  <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-[#1C1B18]">Gas Tank</p>
+                <p className="text-sm text-[#6B6960]">
+                  {gasTank.loading ? (
+                    <span className="inline-block h-4 w-20 bg-[#E4E2DC] rounded animate-pulse" />
+                  ) : gasTank.status?.estimatedPayments ? (
+                    <>~{gasTank.status.estimatedPayments} payments funded</>
+                  ) : (
+                    <>Not activated</>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              {gasTank.loading ? (
+                <div className="h-6 w-16 bg-[#F8F7F4] rounded animate-pulse" />
+              ) : (
+                <p className="font-semibold text-[#1C1B18]">
+                  {gasTank.status?.balance ? `${parseFloat(gasTank.status.balance).toFixed(4)} ETH` : '0 ETH'}
+                </p>
+              )}
+            </div>
+          </div>
+          {gasTank.status?.estimatedPayments !== undefined && gasTank.status.estimatedPayments < 20 && gasTank.status.estimatedPayments > 0 && (
+            <p className="text-xs text-[#E65100] mt-3 pt-3 border-t border-[#E4E2DC]">
+              Low balance - add funds in settings to keep receiving payments
+            </p>
+          )}
+          {!gasTank.status?.canReceive && gasTank.status !== null && (
+            <p className="text-xs text-[#E65100] mt-3 pt-3 border-t border-[#E4E2DC]">
+              Gas tank empty - add funds to receive gasless payments
             </p>
           )}
         </CardContent>
@@ -446,18 +499,54 @@ export function ReceiverDashboard() {
               </div>
             )}
 
-            {/* Request amount */}
+            {/* Gas Tank - Add Funds */}
             <div>
-              <h3 className="font-medium text-[#1C1B18] mb-3">Default Amount (optional)</h3>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  placeholder="0.00"
-                  value={requestAmount}
-                  onChange={(e) => setRequestAmount(e.target.value)}
-                  className="flex-1 h-10 border-[#E4E2DC]"
-                />
-                <span className="text-sm text-[#6B6960] w-12">USDC</span>
+              <h3 className="font-medium text-[#1C1B18] mb-3">Gas Tank</h3>
+              <div className="p-4 rounded-lg bg-[#F8F7F4] space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[#6B6960]">Current balance</span>
+                  <span className="font-medium text-[#1C1B18]">
+                    {gasTank.status?.balance ? `${parseFloat(gasTank.status.balance).toFixed(4)} ETH` : '0 ETH'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[#6B6960]">Payments funded</span>
+                  <span className="font-medium text-[#1C1B18]">
+                    ~{gasTank.status?.estimatedPayments ?? 0}
+                  </span>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  {['0.005', '0.01', '0.02'].map((amt) => (
+                    <button
+                      key={amt}
+                      onClick={() => setDepositAmount(amt)}
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                        depositAmount === amt
+                          ? 'bg-[#1C1B18] text-white'
+                          : 'bg-white border border-[#E4E2DC] text-[#1C1B18]'
+                      }`}
+                    >
+                      {amt} ETH
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  onClick={() => gasTank.deposit(depositAmount)}
+                  disabled={gasTank.txPending}
+                  className="w-full bg-[#1C1B18] hover:bg-[#2D2C28] text-white"
+                >
+                  {gasTank.txPending ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                      Adding...
+                    </span>
+                  ) : (
+                    `Add ${depositAmount} ETH`
+                  )}
+                </Button>
+                {gasTank.error && (
+                  <p className="text-xs text-red-600">{gasTank.error}</p>
+                )}
               </div>
             </div>
 
