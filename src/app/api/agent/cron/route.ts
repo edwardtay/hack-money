@@ -1342,23 +1342,22 @@ export async function POST(request: Request) {
       if (!intent.amount) {
         canExecuteReasons.push('missing_amount')
       }
-      if (intent.action !== 'swap') {
+      if (intent.action !== 'swap' && intent.action !== 'bridge') {
         canExecuteReasons.push(`action_not_supported_yet:${intent.action}`)
       }
-      if (intent.fromChain && intent.fromChain !== 'base') {
-        canExecuteReasons.push(`chain_not_base:${intent.fromChain}`)
-      }
 
-      // High confidence + has wallet + swap on Base = try to execute
+      const account = AGENT_PRIVATE_KEY ? privateKeyToAccount(AGENT_PRIVATE_KEY) : null
+
+      // =======================================================================
+      // EXECUTE SWAP (Base only, via Uniswap v4)
+      // =======================================================================
       if (
         intent.confidence >= 0.7 &&
-        AGENT_PRIVATE_KEY &&
+        account &&
         intent.action === 'swap' &&
         intent.amount &&
         (!intent.fromChain || intent.fromChain === 'base')
       ) {
-        const account = privateKeyToAccount(AGENT_PRIVATE_KEY)
-
         const swapIntent: ParsedIntent = {
           action: 'swap',
           fromToken: intent.token || 'USDC',
@@ -1425,6 +1424,177 @@ export async function POST(request: Request) {
         }
       }
 
+      // =======================================================================
+      // EXECUTE BRIDGE (Cross-chain via LI.FI)
+      // =======================================================================
+      if (
+        intent.confidence >= 0.7 &&
+        account &&
+        intent.action === 'bridge' &&
+        intent.amount &&
+        intent.fromChain &&
+        intent.toChain &&
+        intent.fromChain !== intent.toChain
+      ) {
+        try {
+          // Map chain names to chain IDs
+          const fromChainId = CHAIN_IDS[intent.fromChain]
+          const toChainId = CHAIN_IDS[intent.toChain]
+
+          if (!fromChainId || !toChainId) {
+            return NextResponse.json({
+              success: false,
+              ai: { understood: message, intent },
+              error: `Unsupported chain: ${!fromChainId ? intent.fromChain : intent.toChain}`,
+            })
+          }
+
+          // Determine token addresses
+          const token = (intent.token || 'ETH').toUpperCase()
+          const isNative = token === 'ETH'
+          const fromToken = isNative
+            ? TOKENS.ETH
+            : TOKENS.USDC_BASE // Default to USDC for non-ETH
+
+          // Parse amount (ETH uses 18 decimals, USDC uses 6)
+          const decimals = isNative ? 18 : 6
+          const amountWei = parseUnits(intent.amount, decimals)
+
+          log({
+            type: 'lifi_bridge',
+            receiver: account.address,
+            details: {
+              phase: 'AI_BRIDGE_QUOTE',
+              input: message,
+              fromChain: intent.fromChain,
+              toChain: intent.toChain,
+              amount: intent.amount,
+              token,
+            },
+          })
+
+          // Get LI.FI quote
+          const quote = await getQuote({
+            fromChain: fromChainId,
+            toChain: toChainId,
+            fromToken,
+            toToken: isNative ? TOKENS.ETH : TOKENS.USDC_BASE,
+            fromAmount: amountWei.toString(),
+            fromAddress: account.address,
+            toAddress: account.address,
+            slippage: 0.01,
+          })
+
+          if (!quote || !quote.transactionRequest) {
+            return NextResponse.json({
+              success: false,
+              ai: { understood: message, intent },
+              error: 'LI.FI returned no quote or transaction data',
+            })
+          }
+
+          // Get the correct chain for execution
+          const chainMap: Record<string, typeof base> = {
+            base,
+            mainnet,
+            arbitrum,
+            optimism,
+          }
+          const execChain = chainMap[intent.fromChain] || base
+
+          const walletClient = createWalletClient({
+            account,
+            chain: execChain,
+            transport: http(),
+          })
+
+          log({
+            type: 'lifi_bridge',
+            receiver: account.address,
+            details: {
+              phase: 'AI_BRIDGE_EXECUTING',
+              tool: quote.toolDetails?.name,
+              estimatedOutput: quote.estimate?.toAmount,
+            },
+          })
+
+          // Execute the bridge transaction
+          const txHash = await walletClient.sendTransaction({
+            to: quote.transactionRequest.to as Address,
+            data: quote.transactionRequest.data as `0x${string}`,
+            value: BigInt(quote.transactionRequest.value || '0'),
+            gas: quote.transactionRequest.gasLimit
+              ? BigInt(quote.transactionRequest.gasLimit)
+              : undefined,
+          })
+
+          // Get explorer URL based on chain
+          const explorerUrls: Record<string, string> = {
+            base: 'https://basescan.org/tx/',
+            mainnet: 'https://etherscan.io/tx/',
+            arbitrum: 'https://arbiscan.io/tx/',
+            optimism: 'https://optimistic.etherscan.io/tx/',
+          }
+          const explorerUrl = `${explorerUrls[intent.fromChain] || explorerUrls.base}${txHash}`
+
+          log({
+            type: 'lifi_bridge',
+            receiver: account.address,
+            details: {
+              phase: 'AI_BRIDGE_EXECUTED',
+              input: message,
+              txHash,
+              fromChain: intent.fromChain,
+              toChain: intent.toChain,
+            },
+          })
+
+          return NextResponse.json({
+            success: true,
+            ai: {
+              understood: message,
+              intent,
+              executed: true,
+            },
+            execution: {
+              txHash,
+              explorerUrl,
+              via: `LI.FI (${quote.toolDetails?.name || 'bridge'})`,
+              route: {
+                fromChain: intent.fromChain,
+                toChain: intent.toChain,
+                fromToken: token,
+                amount: intent.amount,
+                estimatedOutput: quote.estimate?.toAmount,
+                tool: quote.toolDetails?.name,
+              },
+            },
+            proof: {
+              aiPowered: true,
+              naturalLanguageToTx: true,
+              llm: 'Groq/Llama-3.3-70b',
+              lifiIntegration: true,
+              crossChain: true,
+            },
+          })
+        } catch (execError) {
+          log({
+            type: 'error',
+            receiver: account.address,
+            details: {
+              phase: 'AI_BRIDGE_ERROR',
+              error: execError instanceof Error ? execError.message : String(execError),
+            },
+          })
+
+          return NextResponse.json({
+            success: false,
+            ai: { understood: message, intent },
+            error: execError instanceof Error ? execError.message : String(execError),
+          })
+        }
+      }
+
       // Return parsed intent without execution
       return NextResponse.json({
         success: true,
@@ -1434,7 +1604,7 @@ export async function POST(request: Request) {
           executed: false,
           reason: canExecuteReasons.length > 0 ? canExecuteReasons : ['unknown'],
         },
-        help: 'Try: "swap 0.05 USDC to USDT on base"',
+        help: 'Try: "swap 0.05 USDC to USDT on base" or "bridge 0.001 ETH from arbitrum to base"',
       })
     } catch (error) {
       return NextResponse.json(

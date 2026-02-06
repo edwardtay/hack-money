@@ -133,6 +133,7 @@ curl -X POST /api/agent/cron \
 
 | Input | Action | TX |
 |-------|--------|-----|
+| "bridge 0.001 ETH from base to arbitrum" | **LI.FI Bridge** | [0xedf88c95...](https://basescan.org/tx/0xedf88c95cfa5c972efa553a1a346d42ae2af51da45d4ea3317f42fab0b2e7f5a) |
 | "swap 0.02 USDC to USDT on base" | V4 Swap | [0xd8b54b9e...](https://basescan.org/tx/0xd8b54b9e696df7b937372afeac6ca7071676dec713b95d3615b372745196bf76) |
 | API trigger | V4 Swap | [0x4be074c2...](https://basescan.org/tx/0x4be074c227df8c2806c2939f11cf9ff4e89e8316498333716b614bd10f9f846b) |
 | API trigger | LI.FI Swap | [0x905a9c5a...](https://basescan.org/tx/0x905a9c5a75ece7158372b26cc161b30dd4ec17309ef6afabd158f83de73b6838) |
