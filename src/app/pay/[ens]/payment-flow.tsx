@@ -362,6 +362,12 @@ export function PaymentFlow({ ensName, prefilledAmount, invoiceId, invoiceMemo }
     b.chain.toLowerCase() === SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name.toLowerCase()
   )
 
+  // Calculate USD value of input amount
+  const inputUsdValue = selectedBalance && amount && parseFloat(amount) > 0
+    ? (selectedBalance.balanceUSD / parseFloat(selectedBalance.balance)) * parseFloat(amount)
+    : 0
+  const receiverUsdValue = inputUsdValue * (1 - (parseFloat(feeTier?.feePercent || '0.15') / 100))
+
   return (
     <div className="max-w-md mx-auto space-y-4">
       {/* Header */}
@@ -471,7 +477,7 @@ export function PaymentFlow({ ensName, prefilledAmount, invoiceId, invoiceMemo }
               <div className="border-t border-[#E4E2DC] pt-2 flex items-center justify-between text-sm">
                 <span className="text-[#6B6960]">{ensName} receives</span>
                 <span className="text-[#22C55E] font-semibold">
-                  ~{(parseFloat(amount) * (1 - (parseFloat(feeTier?.feePercent || '0.15') / 100))).toFixed(6).replace(/\.?0+$/, '')} USDC
+                  ~${receiverUsdValue.toFixed(2)} USDC
                 </span>
               </div>
               {/* Fee comparison */}
