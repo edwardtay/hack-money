@@ -468,28 +468,10 @@ export function PaymentFlow({ ensName, prefilledAmount, invoiceId, invoiceMemo }
                   ~{(parseFloat(amount) * (1 - (parseFloat(feeTier?.feePercent || '0.1') / 100))).toFixed(2)} USDC
                 </span>
               </div>
-              {/* Tier progress */}
-              {feeTier?.nextTier && (
-                <div className="pt-1">
-                  <div className="flex items-center justify-between text-xs text-[#9C9B93]">
-                    <span>{feeTier.tier} tier</span>
-                    <span>${feeTier.volumeToNextTier?.toLocaleString()} to {feeTier.nextTier}</span>
-                  </div>
-                  <div className="mt-1 h-1 bg-[#E4E2DC] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#22C55E] rounded-full transition-all"
-                      style={{ width: `${feeTier.percentToNextTier}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-              {/* Yield share info */}
-              {feeTier?.yieldShareRate && useYieldRoute && (
-                <div className="flex items-center justify-between text-xs text-[#6B6960]">
-                  <span>Yield share (protocol)</span>
-                  <span className="text-[#1C1B18]">{feeTier.yieldShareRate} of earnings</span>
-                </div>
-              )}
+              {/* Fee comparison */}
+              <p className="text-xs text-center text-[#9C9B93] pt-1">
+                Lower than Coinbase (1.5%) or PayPal (2.9%)
+              </p>
               {useYieldRoute && (
                 <div className="flex items-center justify-between text-xs text-[#6B6960]">
                   <span>Auto-deposited to</span>
