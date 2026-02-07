@@ -146,7 +146,7 @@ export function ReceiverDashboard() {
   const agent = useAgentStatus()
 
   const [showSettings, setShowSettings] = useState(false)
-  const [depositAmount, setDepositAmount] = useState('0.005')
+  const [depositAmount, setDepositAmount] = useState('0.001')
   const [selectedVaultId, setSelectedVaultId] = useState<string>('')
   const [selectedStrategy, setSelectedStrategy] = useState<string>('yield')
   const [saving, setSaving] = useState(false)
@@ -397,8 +397,8 @@ export function ReceiverDashboard() {
                 <p className="text-sm text-[#6B6960]">
                   {gasTank.loading ? (
                     <span className="inline-block h-4 w-20 bg-[#E4E2DC] rounded animate-pulse" />
-                  ) : gasTank.status?.estimatedPayments ? (
-                    <>~{gasTank.status.estimatedPayments} gasless payments</>
+                  ) : gasTank.status?.balanceWei && gasTank.status.balanceWei >= BigInt(100000000000000) ? (
+                    <>Active • ~{Math.floor(Number(gasTank.status.balanceWei) / (50000 * 0.01e9))} payments</>
                   ) : (
                     <>Not activated</>
                   )}
@@ -635,17 +635,24 @@ export function ReceiverDashboard() {
                   </span>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  {['0.005', '0.01', '0.02'].map((amt) => (
+                  <input
+                    type="text"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    placeholder="0.001"
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium border border-[#E4E2DC] bg-white text-[#1C1B18] focus:outline-none focus:ring-2 focus:ring-[#1C1B18]"
+                  />
+                  {['0.001', '0.005', '0.01'].map((amt) => (
                     <button
                       key={amt}
                       onClick={() => setDepositAmount(amt)}
-                      className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                         depositAmount === amt
                           ? 'bg-[#1C1B18] text-white'
                           : 'bg-white border border-[#E4E2DC] text-[#1C1B18]'
                       }`}
                     >
-                      {amt} ETH
+                      {amt}
                     </button>
                   ))}
                 </div>
