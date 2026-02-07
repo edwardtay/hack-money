@@ -53,14 +53,21 @@ function useBalances(address?: string) {
     }
 
     setLoading(true)
-    fetch(`/api/balances?address=${address}`)
+    // Use fast mode with timeout to prevent hanging
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000) // 8s timeout
+
+    fetch(`/api/balances?address=${address}&fast=true`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => {
         setBalances(data.balances || [])
         if (data.ethPrice) setEthPrice(data.ethPrice)
       })
       .catch(() => setBalances([]))
-      .finally(() => setLoading(false))
+      .finally(() => {
+        clearTimeout(timeoutId)
+        setLoading(false)
+      })
   }, [address])
 
   return { balances, loading, ethPrice }

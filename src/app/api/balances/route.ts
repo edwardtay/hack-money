@@ -25,11 +25,15 @@ async function getEthPrice(): Promise<number> {
   }
 }
 
-// LI.FI supported chains with token addresses
-const CHAIN_CONFIGS = [
+// Primary chains (fast) - these are checked first
+const PRIMARY_CHAINS = [
   { id: 8453, name: 'base', chain: base, rpc: process.env.BASE_RPC_URL || 'https://mainnet.base.org' },
-  { id: 1, name: 'ethereum', chain: mainnet, rpc: process.env.ETH_RPC_URL || 'https://eth.llamarpc.com' },
   { id: 42161, name: 'arbitrum', chain: arbitrum, rpc: process.env.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc' },
+  { id: 1, name: 'ethereum', chain: mainnet, rpc: process.env.ETH_RPC_URL || 'https://eth.llamarpc.com' },
+] as const
+
+// Secondary chains (slower, only if requested)
+const SECONDARY_CHAINS = [
   { id: 10, name: 'optimism', chain: optimism, rpc: process.env.OPTIMISM_RPC_URL || 'https://mainnet.optimism.io' },
   { id: 137, name: 'polygon', chain: polygon, rpc: 'https://polygon-rpc.com' },
   { id: 43114, name: 'avalanche', chain: avalanche, rpc: 'https://api.avax.network/ext/bc/C/rpc' },
@@ -37,6 +41,9 @@ const CHAIN_CONFIGS = [
   { id: 324, name: 'zksync', chain: zkSync, rpc: 'https://mainnet.era.zksync.io' },
   { id: 59144, name: 'linea', chain: linea, rpc: 'https://rpc.linea.build' },
 ] as const
+
+// Combined for full scan
+const CHAIN_CONFIGS = [...PRIMARY_CHAINS, ...SECONDARY_CHAINS]
 
 // Token addresses per chain (USDC, USDT, DAI where available)
 const TOKENS: Record<string, Record<string, { address: Address; decimals: number }>> = {
@@ -87,6 +94,7 @@ export type TokenBalance = {
 
 export async function GET(req: NextRequest) {
   const address = req.nextUrl.searchParams.get('address')
+  const fast = req.nextUrl.searchParams.get('fast') === 'true' // Only check primary chains
 
   if (!address) {
     return NextResponse.json({ error: 'Address required' }, { status: 400 })
@@ -94,8 +102,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const balances: TokenBalance[] = []
+    const chainsToScan = fast ? PRIMARY_CHAINS : CHAIN_CONFIGS
 
-    const scanPromises = CHAIN_CONFIGS.map(async (chainConfig) => {
+    const scanPromises = chainsToScan.map(async (chainConfig) => {
       const client = createPublicClient({
         chain: chainConfig.chain,
         transport: http(chainConfig.rpc),

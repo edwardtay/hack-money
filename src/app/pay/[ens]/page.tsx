@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { PaymentFlow } from './payment-flow'
+import { PayNav } from './pay-nav'
 import Link from 'next/link'
 
 interface Props {
@@ -37,17 +38,8 @@ export default async function PayPage({ params, searchParams }: Props) {
 
   return (
     <div className="min-h-screen bg-[#F8F7F4]">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-[#E4E2DC] bg-[#F8F7F4]/80 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="ENSIO" className="w-7 h-7 rounded-lg" />
-            <span className="text-[15px] font-semibold tracking-tight text-[#1C1B18]">
-              ENSIO
-            </span>
-          </Link>
-        </div>
-      </nav>
+      {/* Nav with wallet status */}
+      <PayNav />
 
       {/* Main Content */}
       <main className="max-w-lg mx-auto px-6 py-12">
