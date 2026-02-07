@@ -20,12 +20,14 @@ const DEMO_ENS_CACHE: Record<string, ENSResolution> = {
     preferredChain: 'base',
     preferredToken: 'USDC',
     strategy: 'yield',
+    yieldVault: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB', // Aave USDC vault
   },
   'alice.eth': {
     address: '0xcd2E72aEBe2A203b84f46DEEC948E6465dB51c75',
     preferredChain: 'base',
     preferredToken: 'USDC',
     strategy: 'yield',
+    yieldVault: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB', // Aave USDC vault
   },
   'bob.eth': {
     address: '0x1234567890123456789012345678901234567890',
@@ -38,6 +40,14 @@ const DEMO_ENS_CACHE: Record<string, ENSResolution> = {
     preferredChain: 'base',
     preferredToken: 'USDC',
     strategy: 'yield',
+    yieldVault: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB', // Aave USDC vault
+  },
+  'growthepie.eth': {
+    address: '0x9438b8b447179740cd97869997a2fcc9b4aa63a2',
+    preferredChain: 'base',
+    preferredToken: 'USDC',
+    strategy: 'yield',
+    yieldVault: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB', // Aave USDC vault
   },
 }
 
