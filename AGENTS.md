@@ -1,23 +1,25 @@
 # AI-Assisted Development
 
-This project was built with Claude (Anthropic) as a coding partner.
+This project was built with Claude Code (Anthropic CLI) as a coding partner.
 
-## What Claude Did
-- Technical architecture design
-- Smart contract development (Solidity)
-- Frontend implementation (React/Next.js)
-- LI.FI SDK integration
-- ENS text record schema design
-- Code review and debugging
+## My Contributions
+- Product vision: "One link to accept any crypto into your preferred token"
+- Architecture decisions: ENS as payment config, LI.FI for routing, vault zaps for yield
+- Protocol design: `ensio.strategy`, `com.pay.config` ENS text record schema
+- Smart contract specifications and deployment strategy
+- Testing with real funds on mainnet (ETH, Base)
+- Transaction verification and debugging failed routes
+- UX decisions and user flow design
+- Hackathon strategy and prize targeting
 
-## What I Did
-- Product vision and requirements
-- Design decisions and tradeoffs
-- Testing real transactions on mainnet
-- Hackathon submission and demo
+## Claude's Contributions
+- Code implementation (React, Next.js, Solidity)
+- LI.FI SDK integration code
+- ENS resolution and text record parsing
+- Debugging build errors and API issues
+- Code refactoring and cleanup
 
-## Tools Used
-- **Claude Code** (CLI) - Primary development
-- **Cursor** - IDE with Claude integration
+## Process
+All development done via **Claude Code CLI** with human oversight on every commit. I directed the architecture and made all product decisions; Claude wrote the implementation code.
 
 Built for HackMoney 2026.
