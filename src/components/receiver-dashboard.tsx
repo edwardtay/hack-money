@@ -274,7 +274,7 @@ export function ReceiverDashboard() {
   }
 
   const paymentLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/pay/${ensName}`
-  const strategyLabel = currentStrategy === 'restaking' ? 'Renzo (ezETH)' : 'Liquid (USDC)'
+  const strategyLabel = currentStrategy === 'yield' ? 'Earning Yield' : 'USDC (Liquid)'
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
@@ -560,8 +560,8 @@ export function ReceiverDashboard() {
               <h3 className="font-medium text-[#1C1B18] mb-3">Receive As</h3>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: 'liquid', label: 'USDC', desc: 'Stablecoin, instant access', color: '#6B7280' },
-                  { id: 'restaking', label: 'ezETH', desc: 'Renzo restaking rewards', color: '#7C3AED' },
+                  { id: 'liquid', label: 'USDC', desc: 'Instant access' },
+                  { id: 'yield', label: 'Earn Yield', desc: 'Auto-deposit to vault (~5% APY)' },
                 ].map((s) => (
                   <button
                     key={s.id}
