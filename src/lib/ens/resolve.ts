@@ -54,7 +54,7 @@ const DEMO_ENS_CACHE: Record<string, ENSResolution> = {
     preferredChain: 'base',
     preferredToken: 'USDC',
     strategy: 'yield',
-    yieldVault: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB', // Aave USDC vault
+    yieldVault: '0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A', // Morpho Spark USDC vault (verified working)
   },
 }
 
@@ -123,6 +123,7 @@ export async function resolveENS(name: string): Promise<ENSResolution> {
       'yieldroute.vault',
       'flowfi.strategy',
       'flowfi.strategies',
+      'com.pay.config', // New unified config
     ] as const
 
     const results = await Promise.all(
@@ -145,6 +146,24 @@ export async function resolveENS(name: string): Promise<ENSResolution> {
     yieldVault = results[7]
     strategy = results[8]
     strategies = results[9]
+
+    // Parse com.pay.config (takes precedence over legacy records)
+    const payConfig = results[10]
+    if (payConfig) {
+      try {
+        const config = JSON.parse(payConfig)
+        if (config.version === '1.0' && config.receive) {
+          preferredToken = config.receive.token
+          preferredChain = String(config.receive.chain)
+          if (config.receive.vault) {
+            yieldVault = config.receive.vault
+            strategy = 'yield'
+          }
+        }
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
   } catch {
     // Text records not set, that's fine
   }

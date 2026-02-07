@@ -103,12 +103,27 @@ export async function POST(req: NextRequest) {
       strategyAllocations = parseStrategyAllocation(ensStrategy, ensStrategies)
     }
 
+    // Get vault address from ENS resolution (for yield strategy)
+    let yieldVault: string | undefined
+    if (toAddress.endsWith('.eth')) {
+      const ensResult = await resolveENS(toAddress)
+      yieldVault = ensResult.yieldVault
+    }
+
     // Determine final toToken based on strategy
     let finalToToken = toToken || fromToken
-    // Restaking strategy receives WETH (converted to ezETH), liquid receives USDC
+    let useYieldRoute = false
+
     if (ensStrategy === 'restaking') {
+      // Restaking strategy receives WETH (converted to ezETH)
       finalToToken = 'WETH'
       toChain = 'base'
+    } else if (ensStrategy === 'yield' && yieldVault) {
+      // Yield strategy: use LI.FI Zaps with vault as toToken
+      // This deposits directly to the ERC-4626 vault
+      finalToToken = yieldVault // Vault address as toToken
+      toChain = 'base'
+      useYieldRoute = true
     } else {
       // Default to USDC for liquid strategy
       finalToToken = 'USDC'
@@ -206,8 +221,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Note: Yield strategy (vault deposits) is disabled due to LI.FI contract calls bug.
-    // All payments now go directly to recipient as USDC (liquid) or ezETH (restaking).
+    // Yield strategy: Uses LI.FI Zaps (vault address as toToken)
+    // Requires ~600K gas and pre-approval of source token to LI.FI Diamond
 
     // --- STANDARD ROUTES: No vault or yield route failed ---
 
@@ -304,6 +319,8 @@ export async function POST(req: NextRequest) {
       toToken: finalToToken,
       strategy: ensStrategy || 'liquid',
       useV4Route,
+      useYieldRoute,
+      yieldVault: useYieldRoute ? yieldVault : undefined,
       // Multi-strategy allocation info
       strategyAllocations: strategyAllocations.length > 1 ? strategyAllocations : undefined,
       isMultiStrategy: strategyAllocations.length > 1,

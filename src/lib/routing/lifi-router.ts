@@ -74,8 +74,14 @@ export async function findRoutes(params: {
 }): Promise<RouteOption[]> {
   const fromChainId = CHAIN_MAP[params.fromChain] || CHAIN_MAP.ethereum
   const toChainId = CHAIN_MAP[params.toChain] || fromChainId
-  const fromTokenAddr = getTokenAddress(params.fromToken, fromChainId)
-  const toTokenAddr = getTokenAddress(params.toToken, toChainId)
+
+  // Support direct addresses (e.g., vault addresses for yield routing)
+  const fromTokenAddr = params.fromToken.startsWith('0x')
+    ? params.fromToken
+    : getTokenAddress(params.fromToken, fromChainId)
+  const toTokenAddr = params.toToken.startsWith('0x')
+    ? params.toToken
+    : getTokenAddress(params.toToken, toChainId)
 
   if (!fromTokenAddr || !toTokenAddr) {
     return errorRoute(

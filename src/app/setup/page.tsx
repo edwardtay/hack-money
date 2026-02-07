@@ -1,128 +1,113 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ReceiverSetup } from '@/components/receiver-setup'
+import { useAccount, usePublicClient } from 'wagmi'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { Card, CardContent } from '@/components/ui/card'
+import { PayPreferences } from '@/components/pay-preferences'
 
 export default function SetupPage() {
+  const { address, isConnected } = useAccount()
+  const publicClient = usePublicClient({ chainId: 1 })
+  const [ensName, setEnsName] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  // Lookup ENS name for connected wallet
+  useEffect(() => {
+    if (!address || !publicClient) {
+      setEnsName(null)
+      return
+    }
+
+    setLoading(true)
+    publicClient
+      .getEnsName({ address })
+      .then((name) => setEnsName(name))
+      .catch(() => setEnsName(null))
+      .finally(() => setLoading(false))
+  }, [address, publicClient])
+
   return (
     <div className="min-h-screen bg-[#F8F7F4]">
       {/* Header */}
       <header className="border-b border-[#E4E2DC] bg-white">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="ENSIO" className="w-7 h-7 rounded-lg" />
-            <span className="text-lg font-semibold text-[#1C1B18]">ENSIO</span>
+            <span className="text-lg font-semibold text-[#1C1B18]">FlowFi</span>
           </Link>
+          <ConnectButton showBalance={false} />
         </div>
       </header>
 
       {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 py-12">
+      <main className="max-w-md mx-auto px-4 py-12">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-semibold text-[#1C1B18] mb-2">
-            Set Up Your Payment Link
+          <h1 className="text-2xl font-semibold text-[#1C1B18] mb-2">
+            Payment Preferences
           </h1>
           <p className="text-[#6B6960]">
-            Configure how you receive payments. One-time setup.
+            Set how you want to receive payments
           </p>
         </div>
 
-        <ReceiverSetup />
+        <Card className="border-[#E4E2DC] bg-white">
+          <CardContent className="p-6">
+            {!isConnected ? (
+              <div className="text-center space-y-4">
+                <p className="text-[#6B6960]">Connect wallet to set up your payment preferences</p>
+                <ConnectButton />
+              </div>
+            ) : loading ? (
+              <div className="text-center py-8">
+                <span className="animate-spin inline-block w-6 h-6 border-2 border-[#1C1B18] border-t-transparent rounded-full" />
+              </div>
+            ) : !ensName ? (
+              <div className="text-center space-y-4">
+                <div className="w-14 h-14 mx-auto rounded-full bg-[#FEF3C7] flex items-center justify-center">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-[#F59E0B]">
+                    <path d="M12 9V13M12 17H12.01M21 12C21 16.97 16.97 21 12 21C7.03 21 3 16.97 3 12C3 7.03 7.03 3 12 3C16.97 3 21 7.03 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-medium text-[#1C1B18]">No ENS name found</p>
+                  <p className="text-sm text-[#6B6960] mt-1">
+                    Get an ENS name to set up your payment link
+                  </p>
+                </div>
+                <a
+                  href="https://app.ens.domains"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-4 py-2 bg-[#1C1B18] text-white rounded-lg font-medium hover:bg-[#2D2C28] transition-colors"
+                >
+                  Get ENS Name
+                </a>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* ENS Name Display */}
+                <div className="text-center pb-4 border-b border-[#E4E2DC]">
+                  <p className="text-sm text-[#6B6960]">Setting up</p>
+                  <p className="text-xl font-semibold text-[#1C1B18]">{ensName}</p>
+                </div>
 
-        {/* Features */}
-        <div className="mt-12 grid md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl border border-[#E4E2DC] p-6">
-            <div className="w-10 h-10 rounded-lg bg-[#EDE9FE] flex items-center justify-center mb-4">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                className="text-[#8B5CF6]"
-              >
-                <path
-                  d="M12 2L2 7L12 12L22 7L12 2Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M2 17L12 22L22 17"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-[#1C1B18] mb-1">
-              Any Token, Any Chain
-            </h3>
-            <p className="text-sm text-[#6B6960]">
-              Clients pay in ETH, USDT, ARB — from 9+ chains. You receive USDC.
+                {/* Preferences Form */}
+                <PayPreferences ensName={ensName} />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Payment Link Preview */}
+        {ensName && (
+          <div className="mt-6 text-center">
+            <p className="text-xs text-[#9C9B93] uppercase tracking-wide mb-2">Your payment link</p>
+            <p className="font-mono text-[#1C1B18] bg-white rounded-lg px-4 py-3 border border-[#E4E2DC]">
+              flowfi.xyz/pay/{ensName}
             </p>
           </div>
-
-          <div className="bg-white rounded-xl border border-[#E4E2DC] p-6">
-            <div className="w-10 h-10 rounded-lg bg-[#F0FFF4] flex items-center justify-center mb-4">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                className="text-[#22C55E]"
-              >
-                <path
-                  d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-[#1C1B18] mb-1">
-              Earn While You Wait
-            </h3>
-            <p className="text-sm text-[#6B6960]">
-              Payments auto-deposit to Aave. Earn 5% APY on your balance.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl border border-[#E4E2DC] p-6">
-            <div className="w-10 h-10 rounded-lg bg-[#FEF3C7] flex items-center justify-center mb-4">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                className="text-[#F59E0B]"
-              >
-                <path
-                  d="M20 21V19C20 16.79 18.21 15 16 15H8C5.79 15 4 16.79 4 19V21"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle
-                  cx="12"
-                  cy="7"
-                  r="4"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-[#1C1B18] mb-1">
-              ENS is Your Link
-            </h3>
-            <p className="text-sm text-[#6B6960]">
-              alice.eth becomes flowfi.xyz/pay/alice.eth — easy to share.
-            </p>
-          </div>
-        </div>
+        )}
       </main>
     </div>
   )
