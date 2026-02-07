@@ -99,9 +99,12 @@ export async function findRoutes(params: {
   if (cached) return cached
 
   try {
+    // Normalize address to lowercase for LI.FI SDK (strict EIP-55 checksum validation)
+    const normalizedFromAddress = params.fromAddress.toLowerCase()
+
     const result = await withTimeout(
       getRoutes({
-        fromAddress: params.fromAddress,
+        fromAddress: normalizedFromAddress,
         fromChainId,
         toChainId,
         fromTokenAddress: fromTokenAddr,
@@ -186,17 +189,20 @@ export async function findComposerRoutes(params: {
   if (cached) return cached
 
   try {
+    // Normalize address to lowercase for LI.FI SDK (strict EIP-55 checksum validation)
+    const normalizedFromAddress = params.fromAddress.toLowerCase()
+
     // LI.FI Composer: use the standard /v1/quote endpoint with the vault token
     // as `toToken`. The backend detects the vault and builds a Composer workflow.
     const quote = await withTimeout(
       getQuote({
         fromChain: fromChainId,
         fromToken: fromTokenAddr,
-        fromAddress: params.fromAddress,
+        fromAddress: normalizedFromAddress,
         fromAmount: amountWei,
         toChain: toChainId,
         toToken: vaultTokenAddr,
-        toAddress: params.fromAddress,
+        toAddress: normalizedFromAddress,
         slippage: params.slippage || 0.005,
       }),
       20000,
@@ -279,9 +285,12 @@ export async function findContractCallRoutes(params: {
   if (cached) return cached
 
   try {
+    // Normalize address to lowercase for LI.FI SDK (strict EIP-55 checksum validation)
+    const normalizedFromAddress = params.fromAddress.toLowerCase()
+
     const quote = await withTimeout(
       getContractCallsQuote({
-        fromAddress: params.fromAddress,
+        fromAddress: normalizedFromAddress,
         fromChain: fromChainId,
         fromToken: fromTokenAddr,
         toChain: toChainId,
