@@ -66,19 +66,19 @@ async function main() {
   console.log('- Gas cost:', quote.estimate.gasCosts?.[0]?.amountUSD || 'N/A', 'USD')
 
   // LI.FI Diamond address
-  const lifiDiamond = quote.transactionRequest.to as `0x${string}`
+  const lifiDiamond = quote.transactionRequest?.to as `0x${string}`
   console.log('\nLI.FI Diamond:', lifiDiamond)
   console.log('Approval was done in previous run (TX: 0x363ea2659cc851701f2c44b8a8ec50e6d9c94dbf5700013f6452238d05d03d47)')
 
   // Execute the transaction (vault zaps need ~600K+ gas)
   console.log('\nExecuting swap + bridge + vault deposit...')
-  const gasLimit = Math.max(Number(quote.transactionRequest.gasLimit || 0), 700000)
+  const gasLimit = Math.max(Number(quote.transactionRequest?.gasLimit || 0), 700000)
   console.log('Gas limit:', gasLimit)
 
   const tx = await walletClient.sendTransaction({
-    to: quote.transactionRequest.to as `0x${string}`,
-    data: quote.transactionRequest.data as `0x${string}`,
-    value: BigInt(quote.transactionRequest.value || 0),
+    to: quote.transactionRequest!.to as `0x${string}`,
+    data: quote.transactionRequest!.data as `0x${string}`,
+    value: BigInt(quote.transactionRequest!.value || 0),
     gas: BigInt(gasLimit),
   })
 
