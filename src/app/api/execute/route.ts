@@ -92,7 +92,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Yield route — LI.FI Contract Calls with atomic vault deposit
-    if (routeId?.startsWith('yield-route')) {
+    // Trigger on routeId OR if yieldVault is explicitly provided with yield action
+    if (routeId?.startsWith('yield-route') || (yieldVault && intent?.action === 'yield')) {
       if (!yieldVault || !recipient || !intent?.fromToken || !intent?.amount) {
         return NextResponse.json(
           { error: 'Missing yieldVault, recipient, fromToken, or amount for yield route' },
