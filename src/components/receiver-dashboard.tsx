@@ -313,7 +313,7 @@ export function ReceiverDashboard() {
 
               <div className="flex gap-2">
                 <Button onClick={handleCopy} variant="outline" className="flex-1 h-9 text-sm border-[#E4E2DC]">
-                  {copied ? 'Copied!' : 'Copy'}
+                  {copied ? 'Copied!' : 'Copy Link'}
                 </Button>
                 <Button
                   onClick={async () => {
@@ -323,19 +323,9 @@ export function ReceiverDashboard() {
                   }}
                   className="flex-1 h-9 text-sm bg-[#1C1B18] hover:bg-[#2D2C28] text-white"
                 >
-                  Share
+                  Share Link
                 </Button>
               </div>
-              <Button
-                onClick={() => setShowInvoiceModal(true)}
-                variant="outline"
-                className="w-full h-9 text-sm border-[#E4E2DC] mt-2"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="mr-1.5">
-                  <path d="M9 14L11 16L15 12M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Request Payment
-              </Button>
             </div>
           </div>
         </CardContent>
