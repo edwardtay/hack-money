@@ -130,7 +130,7 @@ export async function buildSetYieldVaultTransaction(
 }
 
 /**
- * Build transaction data that writes flowfi.strategy text record
+ * Build transaction data that writes ensio.strategy text record
  * on the user's ENS resolver.
  */
 export async function buildSetStrategyTransaction(
@@ -148,7 +148,7 @@ export async function buildSetStrategyTransaction(
   const data = encodeFunctionData({
     abi: resolverAbi,
     functionName: 'setText',
-    args: [node, 'flowfi.strategy', strategy],
+    args: [node, 'ensio.strategy', strategy],
   })
 
   return {
@@ -160,7 +160,7 @@ export async function buildSetStrategyTransaction(
 }
 
 /**
- * Build transaction data that writes both flowfi.strategy and yieldroute.vault
+ * Build transaction data that writes both ensio.strategy and yieldroute.vault
  * text records on the user's ENS resolver via a single multicall.
  */
 export async function buildSetStrategyAndVaultTransaction(
@@ -183,7 +183,7 @@ export async function buildSetStrategyAndVaultTransaction(
     encodeFunctionData({
       abi: resolverAbi,
       functionName: 'setText',
-      args: [node, 'flowfi.strategy', strategy],
+      args: [node, 'ensio.strategy', strategy],
     })
   )
 
@@ -215,7 +215,7 @@ export async function buildSetStrategyAndVaultTransaction(
 }
 
 /**
- * Build transaction data that writes flowfi.strategies text record
+ * Build transaction data that writes ensio.strategies text record
  * for multi-strategy allocation (e.g., "yield:50,restaking:50").
  */
 export async function buildSetStrategiesTransaction(
@@ -233,7 +233,7 @@ export async function buildSetStrategiesTransaction(
   const data = encodeFunctionData({
     abi: resolverAbi,
     functionName: 'setText',
-    args: [node, 'flowfi.strategies', strategies],
+    args: [node, 'ensio.strategies', strategies],
   })
 
   return {
@@ -246,7 +246,7 @@ export async function buildSetStrategiesTransaction(
 
 /**
  * Build transaction data that writes multiple strategy-related records
- * via a single multicall: flowfi.strategies, flowfi.strategy, yieldroute.vault
+ * via a single multicall: ensio.strategies, ensio.strategy, yieldroute.vault
  */
 export async function buildSetMultiStrategyTransaction(
   ensName: string,
@@ -272,7 +272,7 @@ export async function buildSetMultiStrategyTransaction(
       encodeFunctionData({
         abi: resolverAbi,
         functionName: 'setText',
-        args: [node, 'flowfi.strategies', options.strategies],
+        args: [node, 'ensio.strategies', options.strategies],
       })
     )
   }
@@ -283,7 +283,7 @@ export async function buildSetMultiStrategyTransaction(
       encodeFunctionData({
         abi: resolverAbi,
         functionName: 'setText',
-        args: [node, 'flowfi.strategy', options.strategy],
+        args: [node, 'ensio.strategy', options.strategy],
       })
     )
   }
@@ -348,7 +348,7 @@ export function computeInvoiceHash(invoice: InvoiceData): string {
 
 /**
  * Build transaction data that writes an invoice hash to ENS text record.
- * Record key: flowfi.invoice.{id}
+ * Record key: ensio.invoice.{id}
  * Record value: {hash}:{amount}:{token} (compact format for verification)
  */
 export async function buildSetInvoiceTransaction(
@@ -364,7 +364,7 @@ export async function buildSetInvoiceTransaction(
   }
 
   const invoiceHash = computeInvoiceHash(invoice)
-  const recordKey = `flowfi.invoice.${invoice.id}`
+  const recordKey = `ensio.invoice.${invoice.id}`
   // Compact format: hash:amount:token (allows basic verification without full data)
   const recordValue = `${invoiceHash}:${invoice.amount}:${invoice.token}`
 
@@ -393,7 +393,7 @@ export async function getInvoiceFromENS(
 ): Promise<{ hash: string; amount: string; token: string } | null> {
   try {
     const normalized = normalize(ensName)
-    const recordKey = `flowfi.invoice.${invoiceId}`
+    const recordKey = `ensio.invoice.${invoiceId}`
 
     const value = await client.getEnsText({ name: normalized, key: recordKey })
     if (!value) return null
@@ -470,7 +470,7 @@ export async function buildCreateInvoiceSubdomainTransaction(
   const setTextData = encodeFunctionData({
     abi: resolverAbi,
     functionName: 'setText',
-    args: [subdomainNode, 'flowfi.invoice', invoiceValue],
+    args: [subdomainNode, 'ensio.invoice', invoiceValue],
   })
 
   return {
@@ -514,7 +514,7 @@ export async function getInvoiceFromSubdomain(
     const normalized = normalize(ensName)
     const subdomain = `inv-${invoiceId}.${normalized}`
 
-    const value = await client.getEnsText({ name: subdomain, key: 'flowfi.invoice' })
+    const value = await client.getEnsText({ name: subdomain, key: 'ensio.invoice' })
     if (!value) return null
 
     // Parse compact format: hash:amount:token:memo:expiresAt

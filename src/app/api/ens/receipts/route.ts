@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       subname,
-      // If ENS name provided, also return the FlowFi CCIP-Read pattern
+      // If ENS name provided, also return the ENSIO CCIP-Read pattern
       flowFiSubname: receiverENS ? `tx-${txHash.toLowerCase().slice(0, 10)}.payments.${receiverENS}` : undefined,
     })
   } catch (error: unknown) {

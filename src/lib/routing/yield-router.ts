@@ -103,7 +103,7 @@ export async function getYieldRouteQuote(
     quoteUrl.searchParams.set('toAddress', normalizedRecipient)
     quoteUrl.searchParams.set('slippage', (params.slippage || 0.005).toString())
     quoteUrl.searchParams.set('denyExchanges', DENY_EXCHANGES.join(','))
-    quoteUrl.searchParams.set('integrator', 'flowfi')
+    quoteUrl.searchParams.set('integrator', 'ensio')
 
     const quoteRes = await fetch(quoteUrl.toString())
     const quote = await quoteRes.json()
@@ -227,7 +227,7 @@ export async function getMEVProtectedYieldRouteQuote(
       ],
       slippage: params.slippage || 0.005,
       denyExchanges: DENY_EXCHANGES,
-      integrator: 'flowfi',
+      integrator: 'ensio',
     }
 
     const res = await fetch(contractCallsUrl, {

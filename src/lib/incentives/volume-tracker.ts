@@ -22,7 +22,7 @@ const volumeStore = new Map<string, VolumeRecord>()
 // Demo data for showcasing tiers
 const DEMO_VOLUMES: Record<string, number> = {
   'vitalik.eth': 150_000,     // Enterprise tier
-  'flowfi.eth': 50_000,       // Pro tier
+  'edwardtay.eth': 50_000,    // Pro tier
   'alice.eth': 5_000,         // Growth tier
   'bob.eth': 500,             // Starter tier
 }

@@ -61,7 +61,7 @@ export function buildTransakUrl(config: TransakConfig): string {
   return `${baseUrl}?${params.toString()}`
 }
 
-// Default config for FlowFi (USDC on Base)
+// Default config for ENSIO (USDC on Base)
 export function getDefaultOnrampConfig(walletAddress: string, fiatAmount?: number): TransakConfig {
   return {
     apiKey: process.env.NEXT_PUBLIC_TRANSAK_API_KEY || 'your-api-key',

@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       mode: 'text',
       ...txData,
-      message: `Store invoice ${invoice.id} in ENS record: flowfi.invoice.${invoice.id}`,
+      message: `Store invoice ${invoice.id} in ENS record: ensio.invoice.${invoice.id}`,
     })
   } catch (error) {
     console.error('Invoice ENS write error:', error)
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
         ensName,
         invoiceId: id,
         mode: 'text',
-        recordKey: `flowfi.invoice.${id}`,
+        recordKey: `ensio.invoice.${id}`,
         verified: true,
       })
     }
@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
         subdomainExists: exists,
         checkedLocations: [
           `${subdomain} (subdomain)`,
-          `${ensName} flowfi.invoice.${id} (text record)`,
+          `${ensName} ensio.invoice.${id} (text record)`,
         ],
       },
       { status: 404 }

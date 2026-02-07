@@ -1,12 +1,12 @@
 /**
- * FlowFi Strategy System
+ * ENSIO Strategy System
  *
  * Allows receivers to set their preferred DeFi strategies via ENS text records.
  * Supports single strategy or multi-strategy allocation.
  *
  * ENS Record Format:
- * - Single: flowfi.strategy = "liquid" or "restaking"
- * - Multi:  flowfi.strategies = "liquid:50,restaking:50"
+ * - Single: ensio.strategy = "liquid" or "restaking"
+ * - Multi:  ensio.strategies = "liquid:50,restaking:50"
  *
  * Strategies:
  * - liquid: Keep as liquid USDC (default, no deposit)

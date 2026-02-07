@@ -5,7 +5,7 @@ import {
   type Hex,
 } from 'viem'
 import { getPreference, getPreferenceByNode } from '@/lib/ens/store'
-import { getReceipt, getFlowFiReceipt } from '@/lib/ens/receipt-store'
+import { getReceipt, getENSIOReceipt } from '@/lib/ens/receipt-store'
 import { signGatewayResponse } from '@/lib/ens/gateway-signer'
 
 /**
@@ -177,11 +177,11 @@ export async function GET(
       // In production, this would fetch from DeFiLlama or on-chain
       const apyInfo = APY_DATA[parsed.vaultType] || APY_DATA.default
 
-      if (key === 'flowfi.apy') {
+      if (key === 'ensio.apy') {
         resultValue = apyInfo.apy
-      } else if (key === 'flowfi.tvl') {
+      } else if (key === 'ensio.tvl') {
         resultValue = apyInfo.tvl
-      } else if (key === 'flowfi.protocol') {
+      } else if (key === 'ensio.protocol') {
         resultValue = apyInfo.protocol
       } else if (key === 'description') {
         resultValue = `Current APY: ${apyInfo.apy} via ${apyInfo.protocol}`
@@ -191,11 +191,11 @@ export async function GET(
       const invoiceStatus = await getInvoiceStatus(parsed.invoiceId)
 
       if (invoiceStatus) {
-        if (key === 'flowfi.invoice.status') {
+        if (key === 'ensio.invoice.status') {
           resultValue = invoiceStatus.status
-        } else if (key === 'flowfi.invoice.amount') {
+        } else if (key === 'ensio.invoice.amount') {
           resultValue = invoiceStatus.amount || ''
-        } else if (key === 'flowfi.invoice.paidAt') {
+        } else if (key === 'ensio.invoice.paidAt') {
           resultValue = invoiceStatus.paidAt || ''
         } else if (key === 'description') {
           resultValue = `Invoice ${parsed.invoiceId}: ${invoiceStatus.status}`
@@ -203,9 +203,9 @@ export async function GET(
       }
     } else if (parsed?.type === 'receipt') {
       // Receipt lookup: return text record values from stored receipt
-      // Support both com.payagent.* and com.flowfi.* keys
-      if (key.startsWith('com.flowfi.')) {
-        const flowFiReceipt = await getFlowFiReceipt(parsed.txHash)
+      // Support both com.payagent.* and com.ensio.* keys
+      if (key.startsWith('com.ensio.')) {
+        const flowFiReceipt = await getENSIOReceipt(parsed.txHash)
         if (flowFiReceipt && key in flowFiReceipt) {
           resultValue = flowFiReceipt[key as keyof typeof flowFiReceipt]
         }

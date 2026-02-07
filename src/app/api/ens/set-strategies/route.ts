@@ -5,7 +5,7 @@ import { buildSetMultiStrategyTransaction } from '@/lib/ens/write'
  * POST /api/ens/set-strategies
  *
  * Set multi-strategy allocation on ENS text records.
- * Supports setting flowfi.strategies (multi), flowfi.strategy (single), and yieldroute.vault
+ * Supports setting ensio.strategies (multi), ensio.strategy (single), and yieldroute.vault
  * in a single transaction via multicall.
  *
  * Body:

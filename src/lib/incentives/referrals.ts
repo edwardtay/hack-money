@@ -1,5 +1,5 @@
 /**
- * FlowFi Referral System
+ * ENSIO Referral System
  *
  * Referrers earn 50% of protocol fees from referred users for 6 months.
  * This incentivizes network growth, not just network membership.

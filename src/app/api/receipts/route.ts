@@ -41,12 +41,12 @@ export async function GET(req: NextRequest) {
         receipt,
         subname,
         ccipReadKeys: [
-          'com.flowfi.amount',
-          'com.flowfi.token',
-          'com.flowfi.sender',
-          'com.flowfi.chain',
-          'com.flowfi.timestamp',
-          'com.flowfi.txHash',
+          'com.ensio.amount',
+          'com.ensio.token',
+          'com.ensio.sender',
+          'com.ensio.chain',
+          'com.ensio.timestamp',
+          'com.ensio.txHash',
         ],
       })
     }

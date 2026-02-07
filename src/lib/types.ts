@@ -46,9 +46,9 @@ export type ENSResolution = {
   description?: string
   /** yieldroute.vault — ERC-4626 vault address for auto-yield deposits */
   yieldVault?: string
-  /** flowfi.strategy — DeFi strategy: "yield" | "restaking" | "liquid" */
+  /** ensio.strategy — DeFi strategy: "yield" | "restaking" | "liquid" */
   strategy?: string
-  /** flowfi.strategies — Multi-strategy allocation: "yield:50,restaking:50" */
+  /** ensio.strategies — Multi-strategy allocation: "yield:50,restaking:50" */
   strategies?: string
 }
 
@@ -66,16 +66,16 @@ export type ReceiptTextRecords = {
 }
 
 /**
- * FlowFi-namespaced text records for payment receipts via CCIP-Read.
+ * ENSIO-namespaced text records for payment receipts via CCIP-Read.
  * Pattern: tx-{shortHash}.payments.{name}.eth
  */
-export type FlowFiReceiptTextRecords = {
-  'com.flowfi.amount': string
-  'com.flowfi.token': string
-  'com.flowfi.sender': string
-  'com.flowfi.chain': string
-  'com.flowfi.timestamp': string
-  'com.flowfi.txHash': string
+export type ENSIOReceiptTextRecords = {
+  'com.ensio.amount': string
+  'com.ensio.token': string
+  'com.ensio.sender': string
+  'com.ensio.chain': string
+  'com.ensio.timestamp': string
+  'com.ensio.txHash': string
 }
 
 /**

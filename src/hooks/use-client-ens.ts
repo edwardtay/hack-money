@@ -44,8 +44,8 @@ export function useClientEnsPreferences(ensName: string | null): ENSPreferences 
         // Fetch all records in parallel
         const [vaultResult, strategyResult, strategiesResult, avatarResult] = await Promise.all([
           client!.getEnsText({ name: normalized, key: 'yieldroute.vault' }).catch(() => null),
-          client!.getEnsText({ name: normalized, key: 'flowfi.strategy' }).catch(() => null),
-          client!.getEnsText({ name: normalized, key: 'flowfi.strategies' }).catch(() => null),
+          client!.getEnsText({ name: normalized, key: 'ensio.strategy' }).catch(() => null),
+          client!.getEnsText({ name: normalized, key: 'ensio.strategies' }).catch(() => null),
           client!.getEnsText({ name: normalized, key: 'avatar' }).catch(() => null),
         ])
 

@@ -10,36 +10,36 @@
  */
 
 // In-memory store of ENSIO receivers (in production, this would be a database)
-const flowFiReceivers = new Set<string>([
+const ensioReceivers = new Set<string>([
   // Demo receivers (lowercase)
   'vitalik.eth',
-  'flowfi.eth',
+  'edwardtay.eth',
   'alice.eth',
   'bob.eth',
   // Addresses
   '0xd8da6bf26964af9d7eed9e03e53415d37aa96045', // vitalik.eth
-  '0x999a8dbc672a0da86471e67b9a22ea2b1c91e101', // agent wallet
+  '0x38430336153468dcf36af5cea7d6bc472425633a', // edwardtay.eth
 ])
 
 /**
- * Check if an address/ENS is a registered FlowFi receiver
+ * Check if an address/ENS is a registered ENSIO receiver
  */
-export function isFlowFiReceiver(addressOrEns: string): boolean {
-  return flowFiReceivers.has(addressOrEns.toLowerCase())
+export function isEnsioReceiver(addressOrEns: string): boolean {
+  return ensioReceivers.has(addressOrEns.toLowerCase())
 }
 
 /**
- * Register a new FlowFi receiver
+ * Register a new ENSIO receiver
  */
 export function registerReceiver(addressOrEns: string): void {
-  flowFiReceivers.add(addressOrEns.toLowerCase())
+  ensioReceivers.add(addressOrEns.toLowerCase())
 }
 
 /**
- * Get count of FlowFi receivers (for network stats)
+ * Get count of ENSIO receivers (for network stats)
  */
 export function getReceiverCount(): number {
-  return flowFiReceivers.size
+  return ensioReceivers.size
 }
 
 /**
@@ -51,8 +51,8 @@ export function isInternalPayment(sender: string, receiver: string): {
   receiverIsReceiver: boolean
   discount: string
 } {
-  const senderIsReceiver = isFlowFiReceiver(sender)
-  const receiverIsReceiver = isFlowFiReceiver(receiver)
+  const senderIsReceiver = isEnsioReceiver(sender)
+  const receiverIsReceiver = isEnsioReceiver(receiver)
   const isInternal = senderIsReceiver && receiverIsReceiver
 
   return {
@@ -90,11 +90,11 @@ export function calculateNetworkFee(params: {
       feePercent: '0%',
       isInternal: true,
       networkDiscount: '100%',
-      reason: 'FlowFi-to-FlowFi payment (0% fee)',
+      reason: 'ENSIO-to-ENSIO payment (0% fee)',
     }
   }
 
-  // Sender is FlowFi receiver: 50% discount
+  // Sender is ENSIO receiver: 50% discount
   if (internal.senderIsReceiver) {
     const discountedRate = baseFeeRate / 2
     const feeAmount = (amountUsd * discountedRate) / 10_000
@@ -104,7 +104,7 @@ export function calculateNetworkFee(params: {
       feePercent: `${(discountedRate / 100).toFixed(3)}%`,
       isInternal: false,
       networkDiscount: '50%',
-      reason: 'FlowFi sender discount (50% off)',
+      reason: 'ENSIO sender discount (50% off)',
     }
   }
 

@@ -262,7 +262,7 @@ export function InvoiceModal({ isOpen, onClose, receiverAddress, receiverEns }: 
                     </a>
                   )}
                   <p className="text-xs text-center text-[#9C9B93] mt-2">
-                    Record: flowfi.invoice.{invoiceData?.id}
+                    Record: ensio.invoice.{invoiceData?.id}
                   </p>
                 </div>
               )}

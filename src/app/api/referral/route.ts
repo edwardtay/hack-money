@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   if (address) {
     const stats = getReferrerStats(address)
     const referralCode = generateReferralCode(address)
-    const referralLink = `https://flowfi-crypto.vercel.app/setup?ref=${referralCode}`
+    const referralLink = `https://ensio-pay.vercel.app/setup?ref=${referralCode}`
 
     return NextResponse.json({
       address: stats.address,

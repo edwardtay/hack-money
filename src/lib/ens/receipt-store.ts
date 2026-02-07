@@ -7,14 +7,14 @@
  * Supports:
  * - Lookup by transaction hash
  * - Lookup by ENS name (receiver)
- * - FlowFi text records for CCIP-Read resolution
+ * - ENSIO text records for CCIP-Read resolution
  */
 
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import { buildReceiptTextRecords, buildFlowFiReceiptTextRecords } from './receipts'
-import type { ReceiptTextRecords, FlowFiReceiptTextRecords, PaymentReceipt } from '@/lib/types'
+import { buildReceiptTextRecords, buildENSIOReceiptTextRecords } from './receipts'
+import type { ReceiptTextRecords, ENSIOReceiptTextRecords, PaymentReceipt } from '@/lib/types'
 
 type StoredReceipt = {
   amount: string
@@ -24,7 +24,7 @@ type StoredReceipt = {
   receiverENS?: string // ENS name
   from: string
   textRecords: ReceiptTextRecords
-  flowFiTextRecords: FlowFiReceiptTextRecords
+  ensioTextRecords: ENSIOReceiptTextRecords
   timestamp: number
   createdAt: string
 }
@@ -62,7 +62,7 @@ export async function storeReceipt(
   const store = await readStore()
   const timestamp = Date.now()
   const textRecords = buildReceiptTextRecords(txHash, amount, token, chain, recipient)
-  const flowFiTextRecords = buildFlowFiReceiptTextRecords(txHash, amount, token, chain, from, timestamp)
+  const ensioTextRecords = buildENSIOReceiptTextRecords(txHash, amount, token, chain, from, timestamp)
   store[txHash.toLowerCase()] = {
     amount,
     token,
@@ -71,7 +71,7 @@ export async function storeReceipt(
     receiverENS: receiverENS?.toLowerCase(),
     from: from.toLowerCase(),
     textRecords,
-    flowFiTextRecords,
+    ensioTextRecords,
     timestamp,
     createdAt: new Date(timestamp).toISOString(),
   }
@@ -86,23 +86,23 @@ export async function getReceipt(txHash: string): Promise<ReceiptTextRecords | n
 }
 
 /**
- * Get FlowFi text records for a receipt by transaction hash.
+ * Get ENSIO text records for a receipt by transaction hash.
  * Used by CCIP-Read gateway for resolving tx-{hash}.payments.{name}.eth
  */
-export async function getFlowFiReceipt(txHash: string): Promise<FlowFiReceiptTextRecords | null> {
+export async function getENSIOReceipt(txHash: string): Promise<ENSIOReceiptTextRecords | null> {
   const store = await readStore()
   // Handle both full hash and short hash (first 10 chars including 0x)
   const normalizedHash = txHash.toLowerCase()
 
   // Try exact match first
   if (store[normalizedHash]) {
-    return store[normalizedHash].flowFiTextRecords
+    return store[normalizedHash].ensioTextRecords
   }
 
   // Try matching by prefix (for short hashes like 0xabc123)
   for (const [hash, entry] of Object.entries(store)) {
     if (hash.startsWith(normalizedHash) || normalizedHash.startsWith(hash.slice(0, normalizedHash.length))) {
-      return entry.flowFiTextRecords
+      return entry.ensioTextRecords
     }
   }
 
@@ -132,7 +132,7 @@ export async function getReceiptByTxHash(txHash: string): Promise<PaymentReceipt
   if (!entry) return null
 
   return {
-    txHash: entry.flowFiTextRecords['com.flowfi.txHash'],
+    txHash: entry.ensioTextRecords['com.ensio.txHash'],
     amount: entry.amount,
     token: entry.token,
     sender: entry.from,
@@ -191,7 +191,7 @@ export async function getReceiptsByENS(ensName: string): Promise<PaymentReceipt[
   for (const [, entry] of Object.entries(store)) {
     if (entry.receiverENS?.toLowerCase() === normalizedENS) {
       receipts.push({
-        txHash: entry.flowFiTextRecords['com.flowfi.txHash'],
+        txHash: entry.ensioTextRecords['com.ensio.txHash'],
         amount: entry.amount,
         token: entry.token,
         sender: entry.from,
@@ -215,7 +215,7 @@ export async function getAllReceipts(): Promise<PaymentReceipt[]> {
 
   for (const [, entry] of Object.entries(store)) {
     receipts.push({
-      txHash: entry.flowFiTextRecords['com.flowfi.txHash'],
+      txHash: entry.ensioTextRecords['com.ensio.txHash'],
       amount: entry.amount,
       token: entry.token,
       sender: entry.from,

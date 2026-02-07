@@ -34,7 +34,7 @@ export default function SetupPage() {
       <header className="border-b border-[#E4E2DC] bg-white">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-[#1C1B18]">FlowFi</span>
+            <span className="text-lg font-semibold text-[#1C1B18]">ENSIO</span>
           </Link>
           <ConnectButton showBalance={false} />
         </div>
@@ -104,7 +104,7 @@ export default function SetupPage() {
           <div className="mt-6 text-center">
             <p className="text-xs text-[#9C9B93] uppercase tracking-wide mb-2">Your payment link</p>
             <p className="font-mono text-[#1C1B18] bg-white rounded-lg px-4 py-3 border border-[#E4E2DC]">
-              flowfi.xyz/pay/{ensName}
+              ensio-pay.vercel.app/pay/{ensName}
             </p>
           </div>
         )}

@@ -24,7 +24,7 @@ export interface AgentDecision {
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
-const SYSTEM_PROMPT = `You are FlowFi's AI payment agent. You analyze user requests and extract structured intents.
+const SYSTEM_PROMPT = `You are ENSIO's AI payment agent. You analyze user requests and extract structured intents.
 
 CRITICAL RULES:
 1. NEVER invent or guess values not explicitly stated by the user
@@ -64,7 +64,7 @@ Respond with JSON:
   "reasoning": "brief explanation of what was extracted and what was missing"
 }`
 
-const DECISION_PROMPT = `You are FlowFi's autonomous agent. Analyze the situation and decide whether to act.
+const DECISION_PROMPT = `You are ENSIO's autonomous agent. Analyze the situation and decide whether to act.
 
 Context:
 - You manage gas tanks for receivers (so their payers don't pay gas)

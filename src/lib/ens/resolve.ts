@@ -35,13 +35,6 @@ const DEMO_ENS_CACHE: Record<string, ENSResolution> = {
     preferredToken: 'USDC',
     strategy: 'liquid',
   },
-  'flowfi.eth': {
-    address: '0x999a8dbc672a0da86471e67b9a22ea2b1c91e101',
-    preferredChain: 'base',
-    preferredToken: 'USDC',
-    strategy: 'yield',
-    yieldVault: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB', // Aave USDC vault
-  },
   'growthepie.eth': {
     address: '0x9438b8b447179740cd97869997a2fcc9b4aa63a2',
     preferredChain: 'base',
@@ -119,8 +112,8 @@ export async function resolveENS(name: string): Promise<ENSResolution> {
       'avatar',
       'description',
       'yieldroute.vault',
-      'flowfi.strategy',
-      'flowfi.strategies',
+      'ensio.strategy',
+      'ensio.strategies',
       'com.pay.config', // New unified config
     ] as const
 

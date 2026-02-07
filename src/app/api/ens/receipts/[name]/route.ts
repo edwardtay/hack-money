@@ -111,14 +111,14 @@ export async function GET(
       },
       // ENS text records that could be resolved
       ensRecords: {
-        'flowfi.receipt.id': receipt.id,
-        'flowfi.receipt.txHash': receipt.txHash,
-        'flowfi.receipt.amount': `${receipt.amount} ${receipt.token}`,
-        'flowfi.receipt.from': receipt.from,
-        'flowfi.receipt.to': receipt.to,
-        'flowfi.receipt.chain': receipt.chain,
-        'flowfi.receipt.status': receipt.status,
-        'flowfi.receipt.timestamp': receipt.timestamp.toString(),
+        'ensio.receipt.id': receipt.id,
+        'ensio.receipt.txHash': receipt.txHash,
+        'ensio.receipt.amount': `${receipt.amount} ${receipt.token}`,
+        'ensio.receipt.from': receipt.from,
+        'ensio.receipt.to': receipt.to,
+        'ensio.receipt.chain': receipt.chain,
+        'ensio.receipt.status': receipt.status,
+        'ensio.receipt.timestamp': receipt.timestamp.toString(),
       },
       // CCIP-Read compatible response
       ccipResponse: {

@@ -1,4 +1,4 @@
-import type { ReceiptTextRecords, FlowFiReceiptTextRecords } from '@/lib/types'
+import type { ReceiptTextRecords, ENSIOReceiptTextRecords } from '@/lib/types'
 
 /**
  * Payment receipt subname utilities.
@@ -11,26 +11,26 @@ import type { ReceiptTextRecords, FlowFiReceiptTextRecords } from '@/lib/types'
 const DEFAULT_PARENT = 'payments.payagent.eth'
 
 /**
- * Build FlowFi-namespaced text records for CCIP-Read resolution.
+ * Build ENSIO-namespaced text records for CCIP-Read resolution.
  * Pattern: tx-{shortHash}.payments.{name}.eth
  *
- * @returns A plain object whose keys are FlowFi ENS text-record keys.
+ * @returns A plain object whose keys are ENSIO ENS text-record keys.
  */
-export function buildFlowFiReceiptTextRecords(
+export function buildENSIOReceiptTextRecords(
   txHash: string,
   amount: string,
   token: string,
   chain: string,
   sender: string,
   timestamp: number,
-): FlowFiReceiptTextRecords {
+): ENSIOReceiptTextRecords {
   return {
-    'com.flowfi.amount': amount,
-    'com.flowfi.token': token,
-    'com.flowfi.sender': sender,
-    'com.flowfi.chain': chain,
-    'com.flowfi.timestamp': timestamp.toString(),
-    'com.flowfi.txHash': txHash,
+    'com.ensio.amount': amount,
+    'com.ensio.token': token,
+    'com.ensio.sender': sender,
+    'com.ensio.chain': chain,
+    'com.ensio.timestamp': timestamp.toString(),
+    'com.ensio.txHash': txHash,
   }
 }
 

@@ -89,6 +89,6 @@ src/mcp/
 
 # Private / sensitive
 /private/
-scripts/test-*.ts
+/scripts/
 *.secret
 *.key
